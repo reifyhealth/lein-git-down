@@ -5,9 +5,12 @@
     :state properties
     :init init
     :constructors {[clojure.lang.IDeref] []})
-  (:require [clojure.java.io :as io]
+  (:require [clojure.data.xml :as xml]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as string]
+            [clojure.tools.deps.alpha.gen.pom :as tools-deps-pom]
             [clojure.tools.gitlibs :as git]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project])
@@ -68,18 +71,32 @@
 
 (defmethod resolve-pom! :tools-deps
   [[_ deps]]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+  (tools-deps-pom/sync-pom
+    (edn/read-string (slurp deps))
+    (.getParentFile deps))
+  (io/file (.getParentFile deps) "pom.xml"))
 
-(defmethod resolve-pom! :boot
-  [[_ build]]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+(xml/alias-uri 'pom "http://maven.apache.org/POM/4.0.0")
 
 (defn resolve-default-pom!
-  [dep]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+  [{:keys [mvn-coords version project-root]}]
+  (lein/warn
+    (str  "Could not find known build tooling so generating simple pom. "
+          "Transitive dependencies will NOT be resolved. "
+          "(Hint: supported manifests: project.clj, pom.xml, and deps.edn)"))
+  (let [pom (xml/sexp-as-element
+              [::pom/project
+               {:xmlns "http://maven.apache.org/POM/4.0.0"
+                (keyword "xmlns:xsi") "http://www.w3.org/2001/XMLSchema-instance"
+                (keyword "xsi:schemaLocation") "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"}
+               [::pom/modelVersion "4.0.0"]
+               [::pom/groupId (namespace mvn-coords)]
+               [::pom/artifactId (name mvn-coords)]
+               [::pom/version version]
+               [::pom/name (name mvn-coords)]])
+        pom-file (io/file project-root "pom.xml")]
+    (spit pom-file (xml/indent-str pom))
+    pom-file))
 
 ;;
 ;; Resolve JAR
@@ -96,11 +113,6 @@
 
 (defmethod resolve-jar! :tools-deps
   [[_ deps]]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
-
-(defmethod resolve-jar! :boot
-  [[_ build]]
   ;; TODO!
   (throw (UnsupportedOperationException.)))
 
@@ -152,7 +164,6 @@
               :maven      :>> resolve-pom!
               :leiningen  :>> resolve-pom!
               :tools-deps :>> resolve-pom!
-              :boot       :>> resolve-pom!
               (resolve-default-pom! dep))]
     (io/copy pom destination)))
 
@@ -161,7 +172,6 @@
   (let [jar (condp #(find %2 %1) manifests
               :leiningen  :>> resolve-jar!
               :tools-deps :>> resolve-jar!
-              :boot       :>> resolve-jar!
               :maven      :>> resolve-jar!
               (resolve-default-jar! dep))]
     (io/copy jar destination)))
@@ -221,14 +231,13 @@
   [project-root]
   (set/rename-keys
     (into {}
-          (comp (filter (comp #{"pom.xml" "project.clj" "deps.edn" "build.boot"}
+          (comp (filter (comp #{"pom.xml" "project.clj" "deps.edn"}
                               #(.getName %)))
                 (map (juxt #(.getName %) identity)))
           (.listFiles (io/file project-root)))
     {"pom.xml"     :maven
      "project.clj" :leiningen
-     "deps.edn"    :tools-deps
-     "build.boot"  :boot}))
+     "deps.edn"    :tools-deps}))
 
 (defn -get
   [^AbstractWagon this resource-name ^File destination]
