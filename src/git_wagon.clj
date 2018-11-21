@@ -5,18 +5,18 @@
     :state properties
     :init init
     :constructors {[clojure.lang.IDeref] []})
-  (:require [clojure.tools.gitlibs :as git]
-            [clojure.string :as string]
+  (:require [clojure.java.io :as io]
             [clojure.set :as set]
-            [clojure.java.io :as io]
+            [clojure.string :as string]
+            [clojure.tools.gitlibs :as git]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project])
-  (:import (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException)
-           (org.apache.maven.wagon.repository Repository)
+  (:import (java.io File FileInputStream)
            (java.security MessageDigest)
-           (java.io File FileInputStream)
-           (org.apache.maven.wagon.resource Resource)
-           (org.apache.maven.wagon.events TransferEvent)))
+           (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException)
+           (org.apache.maven.wagon.events TransferEvent)
+           (org.apache.maven.wagon.repository Repository)
+           (org.apache.maven.wagon.resource Resource)))
 
 ;;
 ;; Helpers
