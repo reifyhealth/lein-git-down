@@ -102,29 +102,90 @@
 ;; Resolve JAR
 ;;
 
-(defmulti resolve-jar! first)
-
-(defmethod resolve-jar! :leiningen
-  [[_ project]]
+(defn lein-jar
+  [project]
   (io/file
     (get
       (lein/apply-task "jar" (project/read (str project)) [])
       [:extension "jar"])))
 
+(defn gen-project
+  [{:keys [name group version source-paths resource-paths]} ^File destination]
+  (spit destination
+    (cond-> ()
+            (not-empty resource-paths) (conj resource-paths :resource-paths)
+            (not-empty source-paths)   (conj source-paths :source-paths)
+            true (conj version (symbol group name) 'defproject)))
+  destination)
+
+(declare parse-content*)
+
+(defn parse-element*
+  [element]
+  (hash-map
+     (-> element :tag name keyword)
+     (-> element :content parse-content*)))
+
+(defn parse-content*
+  [content]
+  (if (= 1 (count content))
+     (first content)
+     (->> content
+          (filter map?)
+          (map parse-element*)
+          (apply merge-with
+                 #(cond (vector? %1) (conj %1 %2)
+                        (not (nil? %1)) (vector %1 %2)
+                        :default %2)))))
+
+(defn parse-pom
+  [^File pom-file]
+  (let [{{:keys [artifactId groupId version build]} :project}
+        (->> (io/reader pom-file)
+             xml/parse
+             parse-element*)
+        source-directory (or (:sourceDirectory build) "src")
+        resource-paths (mapv :directory (get-in build [:resources :resource]))]
+    (cond-> {:name artifactId
+             :group groupId
+             :version version
+             :source-paths [source-directory]}
+            resource-paths (assoc :resource-paths resource-paths))))
+
+(defmulti resolve-jar! first)
+
+(defmethod resolve-jar! :leiningen
+  [[_ project]]
+  (lein-jar project))
+
 (defmethod resolve-jar! :tools-deps
   [[_ deps]]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+  (-> (.getParentFile deps)
+      (io/file "pom.xml")
+      parse-pom
+      (gen-project (io/file (.getParentFile deps) "project.clj"))
+      lein-jar))
 
 (defmethod resolve-jar! :maven
-  [[_ build]]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+  [[_ pom]]
+  (-> pom
+      parse-pom
+      (gen-project (io/file (.getParentFile pom) "project.clj"))
+      lein-jar))
 
 (defn resolve-default-jar!
-  [dep]
-  ;; TODO!
-  (throw (UnsupportedOperationException.)))
+  [{:keys [mvn-coords
+           version
+           project-root
+           default-src-root
+           default-resource-root]}]
+  (-> {:name (name mvn-coords)
+       :group (namespace mvn-coords)
+       :version version
+       :source-paths [default-src-root]
+       :resource-paths [default-resource-root]}
+      (gen-project (io/file project-root "project.clj"))
+      lein-jar))
 
 ;;
 ;; Get Resource
@@ -171,8 +232,8 @@
   [{:keys [destination manifests] :as dep}]
   (let [jar (condp #(find %2 %1) manifests
               :leiningen  :>> resolve-jar!
-              :tools-deps :>> resolve-jar!
               :maven      :>> resolve-jar!
+              :tools-deps :>> resolve-jar!
               (resolve-default-jar! dep))]
     (io/copy jar destination)))
 
@@ -251,15 +312,19 @@
             project-root (-> (git-uri this mvn-coords)
                              (git/procure mvn-coords version)
                              (str manifest-root))
-            src-root (str project-root
-                          (get-in-property-as-dir
-                            this [:deps mvn-coords :src-root] "/src"))
+            src-root (get-in-property-as-dir
+                       this [:deps mvn-coords :src-root] "src")
+            resource-root (get-in-property-as-dir
+                            this
+                            [:deps mvn-coords :resource-root]
+                            "resources")
             manifests (get-manifests project-root)]
         (-> dep
-            (assoc :project-root     project-root
-                   :default-src-root src-root
-                   :manifests        manifests
-                   :destination      destination)
+            (assoc :project-root          project-root
+                   :default-src-root      src-root
+                   :default-resource-root resource-root
+                   :manifests             manifests
+                   :destination           destination)
             get-resource!))
       (catch Exception e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
