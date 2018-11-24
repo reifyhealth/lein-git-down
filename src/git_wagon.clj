@@ -15,12 +15,12 @@
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project])
   (:import (java.io File FileInputStream)
+           (java.nio.file Files Paths StandardCopyOption CopyOption)
            (java.security MessageDigest)
            (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
-           (org.apache.maven.wagon.resource Resource)
-           (java.nio.file Files Paths StandardCopyOption CopyOption)))
+           (org.apache.maven.wagon.resource Resource)))
 
 ;;
 ;; Helpers
@@ -308,6 +308,14 @@
      "project.clj" :leiningen
      "deps.edn"    :tools-deps}))
 
+(defn normalize-version
+  [uri version]
+  (or (git/resolve uri version)
+      (throw (Exception.
+               (format
+                 "Could not resolve version '%s' as valid rev in repository"
+                 version)))))
+
 (defn -get
   [^AbstractWagon this resource-name ^File destination]
   (let [resource (Resource. resource-name)]
@@ -315,9 +323,11 @@
     (.fireGetStarted this resource destination)
     (try
       (let [{:keys [mvn-coords version] :as dep} (parse-resource resource-name)
+            git-uri (git-uri this mvn-coords)
+            version (normalize-version git-uri version)
             manifest-root (get-in-property-as-dir
                             this [:deps mvn-coords :manifest-root] "")
-            project-root (-> (git-uri this mvn-coords)
+            project-root (-> git-uri
                              (git/procure mvn-coords version)
                              (str manifest-root))
             src-root (get-in-property-as-dir
@@ -332,7 +342,8 @@
                    :default-src-root      src-root
                    :default-resource-root resource-root
                    :manifests             manifests
-                   :destination           destination)
+                   :destination           destination
+                   :version               version)
             get-resource!))
       (catch Exception e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
