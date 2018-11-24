@@ -19,7 +19,8 @@
            (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
-           (org.apache.maven.wagon.resource Resource)))
+           (org.apache.maven.wagon.resource Resource)
+           (java.nio.file Files Paths StandardCopyOption CopyOption)))
 
 ;;
 ;; Helpers
@@ -70,11 +71,18 @@
   (io/file (lein/apply-task "pom" (project/read (str project)) [])))
 
 (defmethod resolve-pom! :tools-deps
-  [[_ deps]]
-  (tools-deps-pom/sync-pom
-    (edn/read-string (slurp deps))
-    (.getParentFile deps))
-  (io/file (.getParentFile deps) "pom.xml"))
+  [[_ ^File deps]]
+  (let [proj-name (.. deps getParentFile getParentFile getName)
+        temp-pom  (io/file (.getParentFile deps) proj-name "pom.xml")]
+    (io/make-parents temp-pom)
+    (tools-deps-pom/sync-pom
+      (edn/read-string (slurp deps))
+      (.getParentFile temp-pom))
+    (.toFile
+      (Files/move
+        (Paths/get (.toURI temp-pom))
+        (Paths/get (.toURI (io/file (.getParent deps) "pom.xml")))
+        (into-array CopyOption [StandardCopyOption/REPLACE_EXISTING])))))
 
 (xml/alias-uri 'pom "http://maven.apache.org/POM/4.0.0")
 
