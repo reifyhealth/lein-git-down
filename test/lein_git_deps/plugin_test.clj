@@ -49,7 +49,7 @@
       (while (.hasNextLine scanner)
         (.append result (.nextLine scanner))
         (.append result "\n")))
-    (.waitFor process 5000 TimeUnit/MILLISECONDS)
+    (.waitFor process 30000 TimeUnit/MILLISECONDS)
     (lein/info (str result))))
 
 (defn get-clj-time-jar
