@@ -1,6 +1,8 @@
+(def version (-> (slurp "../project.clj") read-string (nth 2)))
+
 (defproject test-project "0.1.0"
   :description "Test project for lein-git-deps"
-  :plugins [[lein-git-deps "0.1.0"]]
+  :plugins [[lein-git-deps #=(eval version)]]
   :middleware [lein-git-deps.plugin/inject-properties]
   :git-deps {cheshire {:coordinates dakrone/cheshire}
              demo-deps {:coordinates puredanger/demo-deps}}
