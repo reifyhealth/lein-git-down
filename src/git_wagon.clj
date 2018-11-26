@@ -87,7 +87,7 @@
 (xml/alias-uri 'pom "http://maven.apache.org/POM/4.0.0")
 
 (defn resolve-default-pom!
-  [{:keys [mvn-coords version project-root]}]
+  [{:keys [mvn-coords version project-root default-src-root default-resource-root]}]
   (lein/warn
     (str  "Could not find known build tooling so generating simple pom. "
           "Transitive dependencies will NOT be resolved. "
@@ -101,7 +101,12 @@
                [::pom/groupId (namespace mvn-coords)]
                [::pom/artifactId (name mvn-coords)]
                [::pom/version version]
-               [::pom/name (name mvn-coords)]])
+               [::pom/name (name mvn-coords)]
+               [::pom/build
+                [::pom/sourceDirectory default-src-root]
+                [::pom/resources
+                 [::pom/resource
+                  [::pom/directory default-resource-root]]]]])
         pom-file (io/file project-root "pom.xml")]
     (spit pom-file (xml/indent-str pom))
     pom-file))
