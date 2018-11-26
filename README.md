@@ -105,7 +105,7 @@ The [`lein-tools-deps`](https://github.com/RickMoynihan/lein-tools-deps) plugin 
 
 Additionally, there are now two places to maintain configurations: the `project.clj` and the `deps.edn`. There may be good reason to maintain both (due to other tooling in your project), however, if the Git resolution feature is the primary motivator, this plugin provides another option.
 
-Ultimately, we wanted the ability to pull in dependencies from a remote Git repository baked into Leiningen with a single place to maintain our build configurations.
+Ultimately, the **TL;DR** is that we wanted the ability to pull in dependencies from a remote Git repository baked into Leiningen with a single place to maintain our build configurations.
 
 ## License
 
