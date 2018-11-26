@@ -347,7 +347,6 @@
             get-resource!))
       (catch Exception e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
-        (.printStackTrace e)
         (throw (TransferFailedException. (.getMessage e) e))))
     (.postProcessListeners this resource destination TransferEvent/REQUEST_GET)
     (.fireGetCompleted this resource destination)))
