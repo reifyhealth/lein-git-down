@@ -41,7 +41,7 @@
 (defn get-in-property-as-dir
   [this ks default]
   (if-let [d (get-in-property this ks)]
-    (if (.startsWith d "/") d (str "/" d))
+    (string/replace d #"^(?!/)" "/")
     default))
 
 (defn put-property

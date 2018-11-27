@@ -8,11 +8,8 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Build and Install
-          command: lein install
-      - run:
-          name: Run tests
-          command: lein test
+          name: Build, Install, and Test
+          command: lein do install, test
       - save-cache:
           paths:
           - ~/.m2
