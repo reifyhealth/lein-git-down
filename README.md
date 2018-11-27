@@ -77,6 +77,15 @@ The plugin supports target projects that have one of the following manifests ava
 
 When a manifest is available, it allows the plugin to resolve the repository's transitive dependencies. If a target repository does not have one of the above manifests available, then it will be provided as a standalone project without any transitive dependencies.
 
+### Private Repositories (SSH Authentication)
+
+As mentioned at the top of this section, when the repository has a `:protocol :ssh` value set the plugin will attempt to use SSH with Public Key Authentication to resolve the dependency from a private repository. Under the covers the code uses [jsch](http://www.jcraft.com/jsch/) with [jsch-agent-proxy](http://www.jcraft.com/jsch-agent-proxy/), which depends on `ssh-agent` running on the machine and properly configured with your keys. Both of the below links provide good information on how to create your SSH keys and get them loaded into `ssh-agent`:
+
+- https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
+- https://help.github.com/articles/working-with-ssh-key-passphrases/
+
+If your private key has a password, there is one additional step that is needed as a workaround. You will need to remove any reference to `IdentityFile` from your `~/.ssh/config` (see [this gist](https://gist.github.com/niclasnilsson/038f20bee1bd19e970d59ba35732e262) for details). There is a [patch](https://dev.clojure.org/jira/browse/TDEPS-49) in to `clojure/tools.gitlibs` with a fix that will resolve the problem. Until then, the workaround is needed if your private key is encrypted.
+
 ## Rationale
 
 The rationale is essentially the same as that of [`tools.deps`](https://clojure.org/reference/deps_and_cli):
