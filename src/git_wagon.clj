@@ -160,12 +160,13 @@
              xml/parse
              parse-element*)
         source-directory (or (:sourceDirectory build) "src")
-        resource-paths (mapv :directory (get-in build [:resources :resource]))]
+        resource-paths (get-in build [:resources :resource :directory])]
     (cond-> {:name artifactId
              :group groupId
              :version version
              :source-paths [source-directory]}
-            resource-paths (assoc :resource-paths resource-paths))))
+            (vector? resource-paths) (assoc :resource-paths resource-paths)
+            (string? resource-paths) (assoc :resource-paths [resource-paths]))))
 
 (defmulti resolve-jar! first)
 
