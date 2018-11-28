@@ -321,6 +321,14 @@
                  "Could not resolve version '%s' as valid rev in repository"
                  version)))))
 
+(defn -resourceExists
+  [^AbstractWagon this resource-name]
+  (try
+    (let [{:keys [mvn-coords version]} (parse-resource resource-name)]
+      (boolean
+        (normalize-version (git-uri this mvn-coords) version)))
+    (catch Throwable _ false)))
+
 (defn -get
   [^AbstractWagon this resource-name ^File destination]
   (let [resource (Resource. resource-name)]
@@ -350,7 +358,7 @@
                    :destination           destination
                    :version               version)
             get-resource!))
-      (catch Exception e
+      (catch Throwable e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
         (throw (TransferFailedException. (.getMessage e) e))))
     (.postProcessListeners this resource destination TransferEvent/REQUEST_GET)
