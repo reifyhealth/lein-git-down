@@ -272,11 +272,11 @@
 
 (defn -getIfNewer
   [this resource file version]
-  (throw (UnsupportedOperationException. "Get if Newer not supported for Git Wagon")))
+  (throw (UnsupportedOperationException. "The wagon you are using has not implemented getIfNewer()")))
 
 (defn -put
   [this file resource]
-  (throw (UnsupportedOperationException. "Put not supported for Git Wagon")))
+  (throw (UnsupportedOperationException. "The wagon you are using has not implemented put()")))
 
 (defn parse-resource
   [resource]
