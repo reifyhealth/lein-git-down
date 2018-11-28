@@ -17,10 +17,12 @@
   (:import (java.io File FileInputStream)
            (java.nio.file Files Paths StandardCopyOption CopyOption)
            (java.security MessageDigest)
-           (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException)
+           (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
-           (org.apache.maven.wagon.resource Resource)))
+           (org.apache.maven.wagon.resource Resource)
+           (org.eclipse.jgit.api.errors InvalidRemoteException)
+           (org.eclipse.jgit.errors NoRemoteRepositoryException)))
 
 ;;
 ;; Helpers
@@ -358,6 +360,15 @@
                    :destination           destination
                    :version               version)
             get-resource!))
+      (catch InvalidRemoteException e
+        (.fireTransferError this resource e TransferEvent/REQUEST_GET)
+        (if (instance? NoRemoteRepositoryException (.getCause e))
+          (do (lein/warn (str "Could not find remote git repository. "
+                              "Did you add the git coordinates to "
+                              "`:git-deps` in project.clj?"))
+              (throw (ResourceDoesNotExistException.
+                       (.getMessage (.getCause e)) e)))
+          (throw (ResourceDoesNotExistException. (.getMessage e) e))))
       (catch Throwable e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
         (throw (TransferFailedException. (.getMessage e) e))))
