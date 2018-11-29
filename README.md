@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[lein-git-deps "0.1.0-alpha"]]
+:plugins [[lein-git-deps "0.1.0"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -83,8 +83,6 @@ As mentioned at the top of this section, when the repository has a `:protocol :s
 
 - https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
 - https://help.github.com/articles/working-with-ssh-key-passphrases/
-
-If your private key has a password, there is one additional step that is needed as a workaround. You will need to remove any reference to `IdentityFile` from your `~/.ssh/config` (see [this gist](https://gist.github.com/niclasnilsson/038f20bee1bd19e970d59ba35732e262) for details). There is a [patch](https://dev.clojure.org/jira/browse/TDEPS-49) in to `clojure/tools.gitlibs` with a fix that will resolve the problem. Until then, the workaround is needed if your private key is encrypted.
 
 ## Rationale
 
