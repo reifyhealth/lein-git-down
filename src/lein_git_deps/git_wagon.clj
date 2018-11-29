@@ -1,4 +1,4 @@
-(ns git-wagon
+(ns lein-git-deps.git-wagon
   (:refer-clojure :exclude [resolve])
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
