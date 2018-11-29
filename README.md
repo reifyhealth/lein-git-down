@@ -67,7 +67,7 @@ Below is an example `project.clj` that uses the plugin:
     :git-deps {cheshire {:coordinates dakrone/cheshire}})
 ```
 
-### Supported Manifests
+### Transitive Dependencies
 
 The plugin supports target projects that have one of the following manifests available:
 
@@ -76,6 +76,8 @@ The plugin supports target projects that have one of the following manifests ava
 - tools.deps `deps.edn`
 
 When a manifest is available, it allows the plugin to resolve the repository's transitive dependencies. If a target repository does not have one of the above manifests available, then it will be provided as a standalone project without any transitive dependencies.
+
+The plugin does support a dependency's git transitive dependencies as well if they are specified in either a Leiningen `project.clj` (from a project that also uses this plugin) or a tools.deps `deps.edn`.
 
 ### Private Repositories (SSH Authentication)
 

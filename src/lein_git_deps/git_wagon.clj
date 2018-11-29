@@ -55,13 +55,18 @@
   (io/file (lein/apply-task "pom" (project/read (str project)) [])))
 
 (defn to-dep
-  [[lib {:keys [mvn/version classifier exclusions]}]]
-  {:group      (or (namespace lib) (name lib))
-   :artifact   (name lib)
-   :version    version
-   :classifier classifier
-   :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
-                    exclusions)})
+  [[lib {:keys [git/url sha mvn/version classifier exclusions]}]]
+  (if url
+    (let [parts (string/split url #"/")]
+      {:group    (penultimate parts)
+       :artifact (-> parts last (string/split #"\.") first)
+       :version  sha})
+    {:group      (or (namespace lib) (name lib))
+     :artifact   (name lib)
+     :version    version
+     :classifier classifier
+     :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
+                      exclusions)}))
 
 (defmethod resolve-pom! :tools-deps
   [[_ ^File deps-edn]]
@@ -318,7 +323,6 @@
     (.fireGetStarted this resource destination)
     (try
       (let [{:keys [mvn-coords version] :as dep} (parse-resource resource-name)
-            _ (println "\n" @properties "\n")
             git-uri (git-uri @properties mvn-coords)
             version (normalize-version git-uri version)
             manifest-root (get-in-as-dir
@@ -343,8 +347,6 @@
             get-resource!))
       (catch InvalidRemoteException e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
-        (println "\n" @properties "\n")
-        (.printStackTrace e)
         (if (instance? NoRemoteRepositoryException (.getCause e))
           (do (lein/warn (str "Could not find remote git repository. "
                               "Did you add the git coordinates to "
