@@ -62,7 +62,8 @@
 
 (defn inject-properties
   [{:keys [git-deps repositories] :as project}]
-  (swap! git-wagon-properties assoc
-         :protocols (get-repo-protocols repositories)
-         :deps (get-deps-properties git-deps))
+  (swap! git-wagon-properties
+         #(merge-with merge %
+            {:protocols  (get-repo-protocols repositories)
+             :deps       (get-deps-properties git-deps)}))
   project)

@@ -318,6 +318,7 @@
     (.fireGetStarted this resource destination)
     (try
       (let [{:keys [mvn-coords version] :as dep} (parse-resource resource-name)
+            _ (println "\n" @properties "\n")
             git-uri (git-uri @properties mvn-coords)
             version (normalize-version git-uri version)
             manifest-root (get-in-as-dir
@@ -342,6 +343,8 @@
             get-resource!))
       (catch InvalidRemoteException e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
+        (println "\n" @properties "\n")
+        (.printStackTrace e)
         (if (instance? NoRemoteRepositoryException (.getCause e))
           (do (lein/warn (str "Could not find remote git repository. "
                               "Did you add the git coordinates to "
