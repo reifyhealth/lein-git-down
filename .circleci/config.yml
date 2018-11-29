@@ -2,35 +2,26 @@ version: 2
 jobs:
   test-and-build:
     environment:
-    - JVM_OPTS: "-Xms8g -Xmx8g"
+      - JVM_OPTS: "-Xms512m -Xmx1024m"
     docker:
-    - image: circleci/openjdk:8-jdk-node
+      - image: circleci/clojure:lein-2.8.1
     steps:
-    - checkout
-    - run:
-        name: Download Leiningen
-        command: |
-          curl -L https://raw.githubusercontent.com/technomancy/leiningen/stable/bin/lein > /usr/local/bin/lein && \
-          chmod +x /usr/local/bin/lein && \
-          lein
-    - run:
-        name: Install
-        command: lein install
-    - run:
-        name: Run tests
-        command: lein test
-    - save-cache:
-        paths:
-        - ~/.m2
-        - ~/.lein
-        key: lein-git-deps-{{ checksum "project.clj" }}
-    - persist_to_workspace:
-        root: .
-        paths:
-        - target
+      - checkout
+      - run:
+          name: Build, Install, and Test
+          command: lein do install, test
+      - save-cache:
+          paths:
+          - ~/.m2
+          - ~/.lein
+          key: lein-git-deps-{{ checksum "project.clj" }}
+      - persist_to_workspace:
+          root: .
+          paths:
+          - target
 
 workflows:
   version: 2
   deploy:
     jobs:
-    - test-and-build
+      - test-and-build
