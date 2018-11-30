@@ -222,6 +222,8 @@
 ;; protected) SSH key to connect to a private repository. Once gitlibs is
 ;; [patched](https://dev.clojure.org/jira/browse/TDEPS-49), this can be removed.
 
+(def ^:dynamic *monkeypatch-tools-gitlibs* true)
+
 (def ssh-callback
   (delay
     (let [factory (doto (ConnectorFactory/getDefault)
@@ -249,12 +251,16 @@
 
 (defn procure
   [uri mvn-coords rev]
-  (with-redefs [git-impl/ssh-callback ssh-callback]
+  (if *monkeypatch-tools-gitlibs*
+    (with-redefs [git-impl/ssh-callback ssh-callback]
+      (git/procure uri mvn-coords rev))
     (git/procure uri mvn-coords rev)))
 
 (defn resolve
   [uri version]
-  (with-redefs [git-impl/ssh-callback ssh-callback]
+  (if *monkeypatch-tools-gitlibs*
+    (with-redefs [git-impl/ssh-callback ssh-callback]
+      (git/resolve uri version))
     (git/resolve uri version)))
 
 (defn parse-resource
@@ -364,6 +370,9 @@
 
 (defn gen
   [properties]
+  (alter-var-root
+    #'*monkeypatch-tools-gitlibs*
+    (constantly (:monkeypatch-tools-gitlibs @properties)))
   (proxy [AbstractWagon] []
     (openConnectionInternal []
       (proxy-openConnectionInternal this properties))
