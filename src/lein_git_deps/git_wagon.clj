@@ -8,7 +8,8 @@
             [clojure.tools.gitlibs.impl :as git-impl]
             [lein-git-deps.impl.pom :as pom]
             [leiningen.core.main :as lein]
-            [leiningen.core.project :as project])
+            [leiningen.core.project :as project]
+            [leiningen.jar :as lein-jar])
   (:import (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
            (com.jcraft.jsch JSch Session UserInfo)
            (java.io File FileInputStream)
@@ -100,10 +101,11 @@
 
 (defn lein-jar
   [project]
-  (io/file
-    (get
-      (lein/apply-task "jar" (project/read (str project)) [])
-      [:extension "jar"])))
+  (-> (project/read (str project))
+      (#'lein/remove-alias "jar")
+      lein-jar/jar
+      (get [:extension "jar"])
+      io/file))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]
