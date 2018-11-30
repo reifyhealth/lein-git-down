@@ -62,7 +62,12 @@
 
 (defn inject-properties
   [{:keys [git-deps repositories] :as project}]
-  (swap! git-wagon-properties assoc
-         :protocols (get-repo-protocols repositories)
-         :deps (get-deps-properties git-deps))
+  (when-not (contains? @git-wagon-properties :monkeypatch-tools-gitlibs)
+    (swap! git-wagon-properties assoc
+      :monkeypatch-tools-gitlibs
+      (boolean (get project :monkeypatch-tools-gitlibs true))))
+  (swap! git-wagon-properties
+         #(merge-with merge %
+            {:protocols  (get-repo-protocols repositories)
+             :deps       (get-deps-properties git-deps)}))
   project)

@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[lein-git-deps "0.1.0-alpha"]]
+:plugins [[lein-git-deps "0.1.0"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -67,7 +67,7 @@ Below is an example `project.clj` that uses the plugin:
     :git-deps {cheshire {:coordinates dakrone/cheshire}})
 ```
 
-### Supported Manifests
+### Transitive Dependencies
 
 The plugin supports target projects that have one of the following manifests available:
 
@@ -77,6 +77,8 @@ The plugin supports target projects that have one of the following manifests ava
 
 When a manifest is available, it allows the plugin to resolve the repository's transitive dependencies. If a target repository does not have one of the above manifests available, then it will be provided as a standalone project without any transitive dependencies.
 
+The plugin does support a dependency's git transitive dependencies as well if they are specified in either a Leiningen `project.clj` (from a project that also uses this plugin) or a tools.deps `deps.edn`.
+
 ### Private Repositories (SSH Authentication)
 
 As mentioned at the top of this section, when the repository has a `:protocol :ssh` value set the plugin will attempt to use SSH with Public Key Authentication to resolve the dependency from a private repository. Under the covers the code uses [jsch](http://www.jcraft.com/jsch/) with [jsch-agent-proxy](http://www.jcraft.com/jsch-agent-proxy/), which depends on `ssh-agent` running on the machine and properly configured with your keys. Both of the below links provide good information on how to create your SSH keys and get them loaded into `ssh-agent`:
@@ -84,7 +86,7 @@ As mentioned at the top of this section, when the repository has a `:protocol :s
 - https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
 - https://help.github.com/articles/working-with-ssh-key-passphrases/
 
-If your private key has a password, there is one additional step that is needed as a workaround. You will need to remove any reference to `IdentityFile` from your `~/.ssh/config` (see [this gist](https://gist.github.com/niclasnilsson/038f20bee1bd19e970d59ba35732e262) for details). There is a [patch](https://dev.clojure.org/jira/browse/TDEPS-49) in to `clojure/tools.gitlibs` with a fix that will resolve the problem. Until then, the workaround is needed if your private key is encrypted.
+Side note: by default the plugin overrides an internal implementation in tools.gitlibs to provide a fix for an error that occurs if your private key has a password. This override will be removed once the [issue](https://dev.clojure.org/jira/browse/TDEPS-49) is resolved in tools.gitlibs. However, you can opt-out of this override by specifying `:monkeypatch-tools-gitlibs false` at the top level of your `project.clj` file.
 
 ## Rationale
 

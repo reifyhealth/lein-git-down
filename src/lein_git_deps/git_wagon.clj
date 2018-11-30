@@ -1,54 +1,37 @@
-(ns git-wagon
-  (:gen-class
-    :name com.reifyhealth.maven.wagon.GitWagon
-    :extends org.apache.maven.wagon.AbstractWagon
-    :state properties
-    :init init
-    :constructors {[clojure.lang.IDeref] []})
-  (:require [clojure.data.xml :as xml]
-            [clojure.edn :as edn]
+(ns lein-git-deps.git-wagon
+  (:refer-clojure :exclude [resolve])
+  (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as string]
-            [clojure.tools.deps.alpha.gen.pom :as tools-deps-pom]
             [clojure.tools.gitlibs :as git]
+            [clojure.tools.gitlibs.impl :as git-impl]
+            [lein-git-deps.impl.pom :as pom]
             [leiningen.core.main :as lein]
-            [leiningen.core.project :as project])
-  (:import (java.io File FileInputStream)
-           (java.nio.file Files Paths StandardCopyOption CopyOption)
+            [leiningen.core.project :as project]
+            [leiningen.jar :as lein-jar])
+  (:import (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
+           (com.jcraft.jsch JSch Session UserInfo)
+           (java.io File FileInputStream)
            (java.security MessageDigest)
-           (org.apache.maven.wagon Wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
+           (org.apache.maven.wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
            (org.apache.maven.wagon.resource Resource)
+           (org.eclipse.jgit.api TransportConfigCallback)
            (org.eclipse.jgit.api.errors InvalidRemoteException)
-           (org.eclipse.jgit.errors NoRemoteRepositoryException)))
+           (org.eclipse.jgit.errors NoRemoteRepositoryException)
+           (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory)))
 
 ;;
 ;; Helpers
 ;;
 
-(defn get-property
-  ([this k]
-   (get-property this k nil))
-  ([this k default]
-   (get @(.properties this) k default)))
-
-(defn get-in-property
-  ([this ks]
-   (get-in-property this ks nil))
-  ([this ks default]
-   (get-in @(.properties this) ks default)))
-
-(defn get-in-property-as-dir
-  [this ks default]
-  (if-let [d (get-in-property this ks)]
+(defn get-in-as-dir
+  [m ks default]
+  (if-let [d (get-in m ks)]
     (string/replace d #"^(?!/)" "/")
     default))
-
-(defn put-property
-  [this k v]
-  (swap! (.properties this) assoc k v))
 
 (defn nth-last
   [n coll]
@@ -72,21 +55,31 @@
   [[_ project]]
   (io/file (lein/apply-task "pom" (project/read (str project)) [])))
 
-(defmethod resolve-pom! :tools-deps
-  [[_ ^File deps]]
-  (let [proj-name (.. deps getParentFile getParentFile getName)
-        temp-pom  (io/file (.getParentFile deps) proj-name "pom.xml")]
-    (io/make-parents temp-pom)
-    (tools-deps-pom/sync-pom
-      (edn/read-string (slurp deps))
-      (.getParentFile temp-pom))
-    (.toFile
-      (Files/move
-        (Paths/get (.toURI temp-pom))
-        (Paths/get (.toURI (io/file (.getParent deps) "pom.xml")))
-        (into-array CopyOption [StandardCopyOption/REPLACE_EXISTING])))))
+(defn to-dep
+  [[lib {:keys [git/url sha mvn/version classifier exclusions]}]]
+  (if url
+    (let [parts (string/split url #"/")]
+      {:group    (penultimate parts)
+       :artifact (-> parts last (string/split #"\.") first)
+       :version  sha})
+    {:group      (or (namespace lib) (name lib))
+     :artifact   (name lib)
+     :version    version
+     :classifier classifier
+     :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
+                      exclusions)}))
 
-(xml/alias-uri 'pom "http://maven.apache.org/POM/4.0.0")
+(defmethod resolve-pom! :tools-deps
+  [[_ ^File deps-edn]]
+  (let [{:keys [paths deps]} (edn/read-string (slurp deps-edn))
+        proj-name (.. deps-edn getParentFile getParentFile getName)]
+    (pom/gen-pom
+      {:group        proj-name
+       :artifact     proj-name
+       :version      "0.1.0"
+       :source-path  (or (first paths) "src")
+       :dependencies (map to-dep deps)}
+      (io/file (.getParentFile deps-edn) "pom.xml"))))
 
 (defn resolve-default-pom!
   [{:keys [mvn-coords version project-root default-src-root default-resource-root]}]
@@ -94,24 +87,13 @@
     (str  "Could not find known build tooling so generating simple pom. "
           "Transitive dependencies will NOT be resolved. "
           "(Hint: supported manifests: project.clj, pom.xml, and deps.edn)"))
-  (let [pom (xml/sexp-as-element
-              [::pom/project
-               {:xmlns "http://maven.apache.org/POM/4.0.0"
-                (keyword "xmlns:xsi") "http://www.w3.org/2001/XMLSchema-instance"
-                (keyword "xsi:schemaLocation") "http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"}
-               [::pom/modelVersion "4.0.0"]
-               [::pom/groupId (namespace mvn-coords)]
-               [::pom/artifactId (name mvn-coords)]
-               [::pom/version version]
-               [::pom/name (name mvn-coords)]
-               [::pom/build
-                [::pom/sourceDirectory default-src-root]
-                [::pom/resources
-                 [::pom/resource
-                  [::pom/directory default-resource-root]]]]])
-        pom-file (io/file project-root "pom.xml")]
-    (spit pom-file (xml/indent-str pom))
-    pom-file))
+  (pom/gen-pom
+    {:group          (namespace mvn-coords)
+     :artifact       (name mvn-coords)
+     :version        version
+     :source-path    default-src-root
+     :resource-paths [default-resource-root]}
+    (io/file project-root "pom.xml")))
 
 ;;
 ;; Resolve JAR
@@ -119,10 +101,11 @@
 
 (defn lein-jar
   [project]
-  (io/file
-    (get
-      (lein/apply-task "jar" (project/read (str project)) [])
-      [:extension "jar"])))
+  (-> (project/read (str project))
+      (#'lein/remove-alias "jar")
+      lein-jar/jar
+      (get [:extension "jar"])
+      io/file))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]
@@ -133,40 +116,17 @@
             true (conj version (symbol group name) 'defproject)))
   destination)
 
-(declare parse-content*)
-
-(defn parse-element*
-  [element]
-  (hash-map
-     (-> element :tag name keyword)
-     (-> element :content parse-content*)))
-
-(defn parse-content*
-  [content]
-  (if (= 1 (count content))
-     (first content)
-     (->> content
-          (filter map?)
-          (map parse-element*)
-          (apply merge-with
-                 #(cond (vector? %1) (conj %1 %2)
-                        (not (nil? %1)) (vector %1 %2)
-                        :default %2)))))
-
 (defn parse-pom
   [^File pom-file]
-  (let [{{:keys [artifactId groupId version build]} :project}
-        (->> (io/reader pom-file)
-             xml/parse
-             parse-element*)
+  (let [{:keys [artifactId groupId version build]} (pom/parse-pom pom-file)
         source-directory (or (:sourceDirectory build) "src")
-        resource-paths (get-in build [:resources :resource :directory])]
+        resource-paths   (get-in build [:resources :resource])]
     (cond-> {:name artifactId
              :group groupId
              :version version
              :source-paths [source-directory]}
-            (vector? resource-paths) (assoc :resource-paths resource-paths)
-            (string? resource-paths) (assoc :resource-paths [resource-paths]))))
+            (vector? resource-paths) (assoc :resource-paths (mapv :directory resource-paths))
+            (map? resource-paths)    (assoc :resource-paths [(:directory resource-paths)]))))
 
 (defmulti resolve-jar! first)
 
@@ -257,29 +217,51 @@
 ;; Extend AbstractWagon
 ;;
 
-(defn -init
-  [d]
-  [[] (or d (atom {}))])
+;; This and the custom `procure` & `resolve` fns are a temporary solution to fix
+;; a problem in JSCH that will cause failures if using an encrypted (password
+;; protected) SSH key to connect to a private repository. Once gitlibs is
+;; [patched](https://dev.clojure.org/jira/browse/TDEPS-49), this can be removed.
 
-(defn -openConnectionInternal
-  [this]
-  (let [^Repository repo (.getRepository ^Wagon this)
-        protocol (if (= :ssh (get-in-property this [:protocols (.getId repo)]))
-                   "ssh://git@"
-                   "https://")
-        host (.getHost repo)
-        port (if (pos? (.getPort repo)) (str ":" (.getPort repo)) "")]
-    (put-property this :base-uri (str protocol host port))))
+(def ^:dynamic *monkeypatch-tools-gitlibs* true)
 
-(defn -closeConnection [this])
+(def ssh-callback
+  (delay
+    (let [factory (doto (ConnectorFactory/getDefault)
+                    (.setPreferredUSocketFactories "jna,nc"))
+          connector (.createConnector factory)]
+      (JSch/setConfig "PreferredAuthentications" "publickey")
+      (reify TransportConfigCallback
+        (configure [_ transport]
+          (.setSshSessionFactory ^SshTransport transport
+            (proxy [JschConfigSessionFactory] []
+              (configure [_host session]
+                (.setUserInfo
+                  ^Session session
+                  (proxy [UserInfo] []
+                    (getPassword [])
+                    (promptYesNo [_] true)
+                    (getPassphrase [])
+                    (promptPassphrase [_] true)
+                    (promptPassword [_] true)
+                    (showMessage [_]))))
+              (getJSch [hc fs]
+                (doto (proxy-super getJSch hc fs)
+                  (.setIdentityRepository
+                    (RemoteIdentityRepository. connector)))))))))))
 
-(defn -getIfNewer
-  [this resource file version]
-  (throw (UnsupportedOperationException. "The wagon you are using has not implemented getIfNewer()")))
+(defn procure
+  [uri mvn-coords rev]
+  (if *monkeypatch-tools-gitlibs*
+    (with-redefs [git-impl/ssh-callback ssh-callback]
+      (git/procure uri mvn-coords rev))
+    (git/procure uri mvn-coords rev)))
 
-(defn -put
-  [this file resource]
-  (throw (UnsupportedOperationException. "The wagon you are using has not implemented put()")))
+(defn resolve
+  [uri version]
+  (if *monkeypatch-tools-gitlibs*
+    (with-redefs [git-impl/ssh-callback ssh-callback]
+      (git/resolve uri version))
+    (git/resolve uri version)))
 
 (defn parse-resource
   [resource]
@@ -298,11 +280,11 @@
      :mvn-coords (symbol group artifact)}))
 
 (defn git-uri
-  [this mvn-coords]
+  [properties mvn-coords]
   (str
-    (get-property this :base-uri)
+    (get properties :base-uri)
     "/"
-    (get-in-property this [:deps mvn-coords :coordinates] mvn-coords)))
+    (get-in properties [:deps mvn-coords :coordinates] mvn-coords)))
 
 (defn get-manifests
   [project-root]
@@ -318,38 +300,48 @@
 
 (defn normalize-version
   [uri version]
-  (or (git/resolve uri version)
+  (or (resolve uri version)
       (throw (Exception.
                (format
                  "Could not resolve version '%s' as valid rev in repository"
                  version)))))
 
-(defn -resourceExists
-  [^AbstractWagon this resource-name]
+(defn proxy-openConnectionInternal
+  [^AbstractWagon this properties]
+  (let [^Repository repo (.getRepository this)
+        protocol (if (= :ssh (get-in @properties [:protocols (.getId repo)]))
+                   "ssh://git@"
+                   "https://")
+        host (.getHost repo)
+        port (if (pos? (.getPort repo)) (str ":" (.getPort repo)) "")]
+    (swap! properties assoc :base-uri (str protocol host port))))
+
+(defn proxy-resourceExists
+  [properties resource-name]
   (try
     (let [{:keys [mvn-coords version]} (parse-resource resource-name)]
       (boolean
-        (normalize-version (git-uri this mvn-coords) version)))
+        (normalize-version (git-uri @properties mvn-coords) version)))
     (catch Throwable _ false)))
 
-(defn -get
-  [^AbstractWagon this resource-name ^File destination]
+(defn proxy-get
+  [^AbstractWagon this properties resource-name ^File destination]
   (let [resource (Resource. resource-name)]
     (.fireGetInitiated this resource destination)
     (.fireGetStarted this resource destination)
     (try
       (let [{:keys [mvn-coords version] :as dep} (parse-resource resource-name)
-            git-uri (git-uri this mvn-coords)
+            git-uri (git-uri @properties mvn-coords)
             version (normalize-version git-uri version)
-            manifest-root (get-in-property-as-dir
-                            this [:deps mvn-coords :manifest-root] "")
+            manifest-root (get-in-as-dir
+                            @properties [:deps mvn-coords :manifest-root] "")
             project-root (-> git-uri
-                             (git/procure mvn-coords version)
+                             (procure mvn-coords version)
                              (str manifest-root))
-            src-root (get-in-property-as-dir
-                       this [:deps mvn-coords :src-root] "src")
-            resource-root (get-in-property-as-dir
-                            this
+            src-root (get-in-as-dir
+                       @properties [:deps mvn-coords :src-root] "src")
+            resource-root (get-in-as-dir
+                            @properties
                             [:deps mvn-coords :resource-root]
                             "resources")
             manifests (get-manifests project-root)]
@@ -375,3 +367,23 @@
         (throw (TransferFailedException. (.getMessage e) e))))
     (.postProcessListeners this resource destination TransferEvent/REQUEST_GET)
     (.fireGetCompleted this resource destination)))
+
+(defn gen
+  [properties]
+  (alter-var-root
+    #'*monkeypatch-tools-gitlibs*
+    (constantly (:monkeypatch-tools-gitlibs @properties)))
+  (proxy [AbstractWagon] []
+    (openConnectionInternal []
+      (proxy-openConnectionInternal this properties))
+    (resourceExists [resource-name]
+      (proxy-resourceExists properties resource-name))
+    (get [resource-name destination]
+      (proxy-get this properties resource-name destination))
+    (closeConnection [])
+    (getIfNewer [_resource-name _file _version]
+      (throw (UnsupportedOperationException.
+               "The wagon you are using has not implemented getIfNewer()")))
+    (put [_destination _resource-name]
+      (throw (UnsupportedOperationException.
+               "The wagon you are using has not implemented put()")))))
