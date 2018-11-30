@@ -2,13 +2,13 @@
   (:require [clojure.string :as string]
             [clojure.walk :as walk])
   (:import (java.io File)
+           (java.util Iterator)
            (javax.xml.parsers DocumentBuilderFactory)
            (javax.xml.transform Transformer TransformerFactory OutputKeys)
            (javax.xml.transform.dom DOMSource)
            (javax.xml.transform.stream StreamResult)
            (org.w3c.dom Document Element Node NodeList)
-           (org.w3c.dom.traversal DocumentTraversal NodeFilter)
-           (java.util Iterator)))
+           (org.w3c.dom.traversal DocumentTraversal NodeFilter)))
 
 (def ^:private xml-schema-ns
   "http://www.w3.org/2001/XMLSchema-instance")
@@ -51,7 +51,7 @@
             (let [resource (branch-node pom resources "resource")]
               (text-node pom resource "directory" rd))))))))
 
-(defn- build-dependencies
+(defn- dependencies-node
   [^Document pom ^Element project dependencies]
   (when (not-empty dependencies)
     (let [deps (branch-node pom project "dependencies")]
@@ -90,7 +90,7 @@
     (text-node pom project "version" version)
     (text-node pom project "name" artifact)
     (build-node pom project source-path resource-paths)
-    (build-dependencies pom project dependencies)
+    (dependencies-node pom project dependencies)
     (write-pom! pom destination))
   destination)
 

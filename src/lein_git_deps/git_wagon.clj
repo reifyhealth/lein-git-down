@@ -9,17 +9,17 @@
             [lein-git-deps.impl.pom :as pom]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project])
-  (:import (java.io File FileInputStream)
+  (:import (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
+           (com.jcraft.jsch JSch Session UserInfo)
+           (java.io File FileInputStream)
            (java.security MessageDigest)
            (org.apache.maven.wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
            (org.apache.maven.wagon.resource Resource)
+           (org.eclipse.jgit.api TransportConfigCallback)
            (org.eclipse.jgit.api.errors InvalidRemoteException)
            (org.eclipse.jgit.errors NoRemoteRepositoryException)
-           (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
-           (com.jcraft.jsch JSch Session UserInfo)
-           (org.eclipse.jgit.api TransportConfigCallback)
            (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory)))
 
 ;;
