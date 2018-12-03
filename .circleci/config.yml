@@ -14,14 +14,32 @@ jobs:
           paths:
           - ~/.m2
           - ~/.lein
-          key: lein-git-deps-{{ checksum "project.clj" }}
+          key: lein-git-down-{{ checksum "project.clj" }}
       - persist_to_workspace:
-          root: .
+          root: ./
           paths:
-          - target
+            - ./
+  deploy:
+    docker:
+      - image: circleci/clojure:lein-2.8.1
+    steps:
+      - checkout
+      - restore_cache:
+          key: lein-git-down-{{ checksum "project.clj" }}
+      - attach_workspace:
+          at: ./
+      - run:
+          name: Deploy to Clojars
+          command: lein deploy clojars
 
 workflows:
   version: 2
   deploy:
     jobs:
       - test-and-build
+      - deploy:
+          filters:
+            branches:
+              only: /(master)/
+          requires:
+            - test-and-build

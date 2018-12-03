@@ -1,4 +1,4 @@
-(ns lein-git-deps.plugin-test
+(ns lein-git-down.plugin-test
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest testing is]]
             [clojure.tools.gitlibs :as git]
