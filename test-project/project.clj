@@ -2,7 +2,7 @@
 
 (defproject test-project "0.1.0"
   :description "Test project for lein-git-down"
-  :plugins [[lein-git-down #=(eval version)]]
+  :plugins [[reifyhealth/lein-git-down #=(eval version)]]
   :middleware [lein-git-down.plugin/inject-properties]
   :git-down {cheshire {:coordinates dakrone/cheshire}
              demo-deps {:coordinates puredanger/demo-deps}}
