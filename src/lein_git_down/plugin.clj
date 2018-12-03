@@ -1,4 +1,4 @@
-(ns lein-git-deps.plugin
+(ns lein-git-down.plugin
   (:require [clojure.string :as string]
             [leiningen.core.main :as lein]))
 

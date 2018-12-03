@@ -1,4 +1,4 @@
 {"git"
- (do (require '[lein-git-deps.plugin])
-     (require '[lein-git-deps.git-wagon])
-     #(lein-git-deps.git-wagon/gen lein-git-deps.plugin/git-wagon-properties))}
+ (do (require '[lein-git-down.plugin])
+     (require '[lein-git-down.git-wagon])
+     #(lein-git-down.git-wagon/gen lein-git-down.plugin/git-wagon-properties))}

@@ -1,4 +1,4 @@
-(ns lein-git-deps.impl.pom
+(ns lein-git-down.impl.pom
   (:require [clojure.string :as string]
             [clojure.walk :as walk])
   (:import (java.io File)

@@ -1,4 +1,4 @@
-(ns lein-git-deps.git-wagon
+(ns lein-git-down.git-wagon
   (:refer-clojure :exclude [resolve])
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -6,7 +6,7 @@
             [clojure.string :as string]
             [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
-            [lein-git-deps.impl.pom :as pom]
+            [lein-git-down.impl.pom :as pom]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project]
             ;; Since these ns's are dynamically loaded when a task is run, it
