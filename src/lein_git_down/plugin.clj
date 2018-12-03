@@ -1,4 +1,4 @@
-(ns lein-git-deps.plugin
+(ns lein-git-down.plugin
   (:require [clojure.string :as string]
             [leiningen.core.main :as lein]))
 
@@ -45,23 +45,23 @@
                   resource-root))))
 
 (defn- validate-properties
-  [git-deps]
-  (if-let [errors (seq (reduce validate-property-map [] (vals git-deps)))]
+  [git-down]
+  (if-let [errors (seq (reduce validate-property-map [] (vals git-down)))]
     (lein/warn
-      (str "Found errors validating `git-deps` properties:\n  - "
+      (str "Found errors validating `git-down` properties:\n  - "
            (string/join "\n  - " errors)))
-    git-deps))
+    git-down))
 
 (defn- get-deps-properties
-  [git-deps]
+  [git-down]
   (validate-properties
     (into {}
           (map (fn [[k v]]
                  (if (namespace k) [k v] [(symbol (name k) (name k)) v])))
-          git-deps)))
+          git-down)))
 
 (defn inject-properties
-  [{:keys [git-deps repositories] :as project}]
+  [{:keys [git-down repositories] :as project}]
   (when-not (contains? @git-wagon-properties :monkeypatch-tools-gitlibs)
     (swap! git-wagon-properties assoc
       :monkeypatch-tools-gitlibs
@@ -69,5 +69,5 @@
   (swap! git-wagon-properties
          #(merge-with merge %
             {:protocols  (get-repo-protocols repositories)
-             :deps       (get-deps-properties git-deps)}))
+             :deps      (get-deps-properties git-down)}))
   project)

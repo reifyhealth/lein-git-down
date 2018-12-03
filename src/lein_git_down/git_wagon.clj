@@ -1,4 +1,4 @@
-(ns lein-git-deps.git-wagon
+(ns lein-git-down.git-wagon
   (:refer-clojure :exclude [resolve])
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
@@ -6,10 +6,14 @@
             [clojure.string :as string]
             [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
-            [lein-git-deps.impl.pom :as pom]
+            [lein-git-down.impl.pom :as pom]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project]
-            [leiningen.jar :as lein-jar])
+            ;; Since these ns's are dynamically loaded when a task is run, it
+            ;; can cause race conditions with the wagon threads loading jars.
+            ;; To avoid this, we are requiring them here.
+            [leiningen.jar]
+            [leiningen.javac])
   (:import (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
            (com.jcraft.jsch JSch Session UserInfo)
            (java.io File FileInputStream)
@@ -101,11 +105,10 @@
 
 (defn lein-jar
   [project]
-  (-> (project/read (str project))
-      (#'lein/remove-alias "jar")
-      lein-jar/jar
-      (get [:extension "jar"])
-      io/file))
+  (io/file
+    (get
+      (lein/apply-task "jar" (project/read (str project)) [])
+      [:extension "jar"])))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]
@@ -357,8 +360,8 @@
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
         (if (instance? NoRemoteRepositoryException (.getCause e))
           (do (lein/warn (str "Could not find remote git repository. "
-                              "Did you add the git coordinates to "
-                              "`:git-deps` in project.clj?"))
+                              "Did you add the git coordinates to the "
+                              "`:git-down` key in project.clj?"))
               (throw (ResourceDoesNotExistException.
                        (.getMessage (.getCause e)) e)))
           (throw (ResourceDoesNotExistException. (.getMessage e) e))))
