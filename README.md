@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[lein-git-down "0.1.0"]]
+:plugins [[lein-git-down "0.1.0-alpha"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -48,7 +48,7 @@ Below is an example `project.clj` that uses the plugin:
 (defproject test-project "0.1.0"
     :description "A test project"
     ;; Include the plugin
-    :plugins [[lein-git-down "0.1.0"]]
+    :plugins [[lein-git-down "0.1.0-alpha"]]
     ;; Add the middleware to parse the custom configurations
     :middleware [lein-git-down.plugin/inject-properties]
     ;; Specify your dependencies. This is the same as any other project.clj and
