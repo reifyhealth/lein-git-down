@@ -1,4 +1,4 @@
-(defproject lein-git-down "0.1.0-alpha"
+(defproject reifyhealth/lein-git-down "0.1.0"
   :description "A Leiningen plugin for resolving Clojure(Script) dependencies from a Git repository"
   :url "http://github.com/reifyhealth/lein-git-down"
   :license {:name "MIT"}
