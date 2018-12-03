@@ -361,7 +361,9 @@
         (if (instance? NoRemoteRepositoryException (.getCause e))
           (do (lein/warn (str "Could not find remote git repository. "
                               "Did you add the git coordinates to the "
-                              "`:git-down` key in project.clj?"))
+                              "`:git-down` key in project.clj? If so, "
+                              "you may not have permissions to read "
+                              "the repository if it is private."))
               (throw (ResourceDoesNotExistException.
                        (.getMessage (.getCause e)) e)))
           (throw (ResourceDoesNotExistException. (.getMessage e) e))))
