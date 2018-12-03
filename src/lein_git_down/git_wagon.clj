@@ -360,8 +360,8 @@
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
         (if (instance? NoRemoteRepositoryException (.getCause e))
           (do (lein/warn (str "Could not find remote git repository. "
-                              "Did you add the git coordinates to "
-                              "`:git-deps` in project.clj?"))
+                              "Did you add the git coordinates to the "
+                              "`:git-down` key in project.clj?"))
               (throw (ResourceDoesNotExistException.
                        (.getMessage (.getCause e)) e)))
           (throw (ResourceDoesNotExistException. (.getMessage e) e))))

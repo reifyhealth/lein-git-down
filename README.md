@@ -27,10 +27,10 @@ Now, simply add the `rev` (Commit SHA or Tag) you want to pull in from the remot
 
 ### Configuration
 
-The plugin provides some optional configuration properties. First, add the `inject-properties` function to your middleware as specified above, then add a `git-deps` key to your project definition. It should point to a map where the dependency's Maven coordinates symbol is the key and a map of properties is the value, for example:
+The plugin provides some optional configuration properties. First, add the `inject-properties` function to your middleware as specified above, then add a `:git-down` key to your project definition. It should point to a map where the dependency's Maven coordinates symbol is the key and a map of properties is the value, for example:
 
 ```clojure
-:git-deps {group/artifact {:property "value"}}
+:git-down {group/artifact {:property "value"}}
 ```
 
 The available properties are:
@@ -64,7 +64,7 @@ Below is an example `project.clj` that uses the plugin:
     ;; The `clj-time` repository uses the same Git coordinates on GitHub as its
     ;; Maven coordinates, so no need to add anything here. `cheshire`, however,
     ;; does not, so we need to add the Git coordinates to our configuration.
-    :git-deps {cheshire {:coordinates dakrone/cheshire}})
+    :git-down {cheshire {:coordinates dakrone/cheshire}})
 ```
 
 ### Transitive Dependencies
