@@ -86,6 +86,8 @@ As mentioned at the top of this section, when the repository has a `:protocol :s
 - https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
 - https://help.github.com/articles/working-with-ssh-key-passphrases/
 
+One caveat to the above articles, the SSH library used by this plugin does not support private keys in OpenSSH format, which is now the default format used by `ssh-keygen`. You will need to generate your key pair in PEM format using the `-m PEM` flag.
+
 Side note: by default the plugin overrides an internal implementation in tools.gitlibs to provide a fix for an error that occurs if your private key has a password. This override will be removed once the [issue](https://dev.clojure.org/jira/browse/TDEPS-49) is resolved in tools.gitlibs. However, you can opt-out of this override by specifying `:monkeypatch-tools-gitlibs false` at the top level of your `project.clj` file.
 
 ## Rationale
