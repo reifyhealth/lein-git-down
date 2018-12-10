@@ -18,8 +18,8 @@
 (def deps-root
   (io/file (git/cache-dir)))
 
-(def clj-time-path
-  "clj-time/clj-time/66ea91e68583e7ee246d375859414b9a9b7aba57")
+(def pomegranate-path
+  "com/cemerick/pomegranate/a8d0ef79d6cbbd9392dbe7f824e32dc60d46e0c0")
 
 (def cheshire-path
   "cheshire/cheshire/c79ebaa3f56c365a1810f80617c80a3b62999701")
@@ -27,11 +27,14 @@
 (def demo-deps-path
   "demo-deps/demo-deps/19d387dc11d804ab955207a263dfba5dbd15bf2c")
 
+(def clj-time-path
+  "clj-time/clj-time/66ea91e68583e7ee246d375859414b9a9b7aba57")
+
 (defn clean-up-artifacts!
   "Deletes all gitlibs and m2 artifacts from the local filesystem to prepare
   for testing"
   []
-  (doseq [path [clj-time-path cheshire-path demo-deps-path]
+  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path]
           root [m2-root deps-root]]
     (let [dir (io/file root path)]
       (->> (file-seq dir)
@@ -52,11 +55,11 @@
     (.waitFor process 60000 TimeUnit/MILLISECONDS)
     (lein/info (str result))))
 
-(defn get-clj-time-jar
+(defn get-pomegranate-jar
   []
   (io/file m2-root
-           clj-time-path
-           "clj-time-66ea91e68583e7ee246d375859414b9a9b7aba57.jar"))
+           pomegranate-path
+           "pomegranate-a8d0ef79d6cbbd9392dbe7f824e32dc60d46e0c0.jar"))
 
 (defn get-cheshire-jar
   []
@@ -70,6 +73,12 @@
            demo-deps-path
            "demo-deps-19d387dc11d804ab955207a263dfba5dbd15bf2c.jar"))
 
+(defn get-clj-time-jar
+  []
+  (io/file m2-root
+           clj-time-path
+           "clj-time-66ea91e68583e7ee246d375859414b9a9b7aba57.jar"))
+
 (deftest resolve-git-deps
   (testing "Resolution of git dependencies"
 
@@ -80,7 +89,7 @@
       (run-command! ["lein" "jar"] (io/file "test-project"))
 
       (testing "for pom based project"
-        (let [^File jar (get-clj-time-jar)]
+        (let [^File jar (get-pomegranate-jar)]
           (is (.exists jar))))
 
       (testing "for lein based project"
@@ -89,6 +98,10 @@
 
       (testing "for deps based project"
         (let [^File jar (get-demo-deps-jar)]
+          (is (.exists jar))))
+
+      (testing "for multiple project"
+        (let [^File jar (get-clj-time-jar)]
           (is (.exists jar)))))
 
     (testing "without cleaning"
@@ -96,7 +109,7 @@
       (run-command! ["lein" "jar"] (io/file "test-project"))
 
       (testing "for pom based project"
-        (let [^File jar (get-clj-time-jar)]
+        (let [^File jar (get-pomegranate-jar)]
           (is (.exists jar))))
 
       (testing "for lein based project"
@@ -105,4 +118,8 @@
 
       (testing "for deps based project"
         (let [^File jar (get-demo-deps-jar)]
+          (is (.exists jar))))
+
+      (testing "for multiple project"
+        (let [^File jar (get-clj-time-jar)]
           (is (.exists jar)))))))

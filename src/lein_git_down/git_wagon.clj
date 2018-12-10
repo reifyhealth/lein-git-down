@@ -1,31 +1,27 @@
 (ns lein-git-down.git-wagon
-  (:refer-clojure :exclude [resolve])
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.set :as set]
             [clojure.string :as string]
-            [clojure.tools.gitlibs :as git]
-            [clojure.tools.gitlibs.impl :as git-impl]
+            [lein-git-down.impl.git :as git]
             [lein-git-down.impl.pom :as pom]
+            [leiningen.core.eval :as leval]
             [leiningen.core.main :as lein]
             [leiningen.core.project :as project]
             ;; Since these ns's are dynamically loaded when a task is run, it
             ;; can cause race conditions with the wagon threads loading jars.
             ;; To avoid this, we are requiring them here.
-            [leiningen.jar]
+            [leiningen.jar :as lein-jar]
             [leiningen.javac])
-  (:import (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
-           (com.jcraft.jsch JSch Session UserInfo)
-           (java.io File FileInputStream)
+  (:import (java.io File FileInputStream)
            (java.security MessageDigest)
            (org.apache.maven.wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
            (org.apache.maven.wagon.resource Resource)
-           (org.eclipse.jgit.api TransportConfigCallback)
            (org.eclipse.jgit.api.errors InvalidRemoteException)
            (org.eclipse.jgit.errors NoRemoteRepositoryException)
-           (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory)))
+           (org.apache.commons.codec.binary Hex)))
 
 ;;
 ;; Helpers
@@ -104,11 +100,14 @@
 ;;
 
 (defn lein-jar
-  [project]
-  (io/file
-    (get
-      (lein/apply-task "jar" (project/read (str project)) [])
-      [:extension "jar"])))
+  [project-file]
+  (let [{:keys [root] :as project} (project/read (str project-file))]
+    (binding [leval/*dir* root]
+      (-> project
+          (#'lein/remove-alias "jar")
+          lein-jar/jar
+          (get [:extension "jar"])
+          io/file))))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]
@@ -182,9 +181,8 @@
 
 (defn calculate-checksum
   [bytes instance]
-  (.toString
-    (BigInteger. 1 (.digest instance bytes))
-    16))
+  (String.
+    (Hex/encodeHex (.digest instance bytes))))
 
 (defmethod get-resource! :checksum
   [{:keys [destination checksum]}]
@@ -219,52 +217,6 @@
 ;;
 ;; Extend AbstractWagon
 ;;
-
-;; This and the custom `procure` & `resolve` fns are a temporary solution to fix
-;; a problem in JSCH that will cause failures if using an encrypted (password
-;; protected) SSH key to connect to a private repository. Once gitlibs is
-;; [patched](https://dev.clojure.org/jira/browse/TDEPS-49), this can be removed.
-
-(def ^:dynamic *monkeypatch-tools-gitlibs* true)
-
-(def ssh-callback
-  (delay
-    (let [factory (doto (ConnectorFactory/getDefault)
-                    (.setPreferredUSocketFactories "jna,nc"))
-          connector (.createConnector factory)]
-      (JSch/setConfig "PreferredAuthentications" "publickey")
-      (reify TransportConfigCallback
-        (configure [_ transport]
-          (.setSshSessionFactory ^SshTransport transport
-            (proxy [JschConfigSessionFactory] []
-              (configure [_host session]
-                (.setUserInfo
-                  ^Session session
-                  (proxy [UserInfo] []
-                    (getPassword [])
-                    (promptYesNo [_] true)
-                    (getPassphrase [])
-                    (promptPassphrase [_] true)
-                    (promptPassword [_] true)
-                    (showMessage [_]))))
-              (getJSch [hc fs]
-                (doto (proxy-super getJSch hc fs)
-                  (.setIdentityRepository
-                    (RemoteIdentityRepository. connector)))))))))))
-
-(defn procure
-  [uri mvn-coords rev]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/procure uri mvn-coords rev))
-    (git/procure uri mvn-coords rev)))
-
-(defn resolve
-  [uri version]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/resolve uri version))
-    (git/resolve uri version)))
 
 (defn parse-resource
   [resource]
@@ -303,7 +255,7 @@
 
 (defn normalize-version
   [uri version]
-  (or (resolve uri version)
+  (or (git/resolve uri version)
       (throw (Exception.
                (format
                  "Could not resolve version '%s' as valid rev in repository"
@@ -339,7 +291,7 @@
             manifest-root (get-in-as-dir
                             @properties [:deps mvn-coords :manifest-root] "")
             project-root (-> git-uri
-                             (procure mvn-coords version)
+                             (git/procure mvn-coords version)
                              (str manifest-root))
             src-root (get-in-as-dir
                        @properties [:deps mvn-coords :src-root] "src")
@@ -375,9 +327,6 @@
 
 (defn gen
   [properties]
-  (alter-var-root
-    #'*monkeypatch-tools-gitlibs*
-    (constantly (:monkeypatch-tools-gitlibs @properties)))
   (proxy [AbstractWagon] []
     (openConnectionInternal []
       (proxy-openConnectionInternal this properties))
