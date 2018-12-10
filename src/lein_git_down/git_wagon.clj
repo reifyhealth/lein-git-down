@@ -184,17 +184,27 @@
   (String.
     (Hex/encodeHex (.digest instance bytes))))
 
+(defn get-file-to-checksum
+  [destination checksum]
+  (let [file-re (-> (.getAbsolutePath destination)
+                    (string/split (re-pattern (str "\\." checksum)))
+                    first
+                    (string/split #"/")
+                    last
+                    (str "\\.[^\\.]+$")
+                    re-pattern)]
+    (->> (.getParentFile destination)
+         file-seq
+         (remove #(= % destination))
+         (filter #(->> % .getName (re-find file-re)))
+         first)))
+
 (defmethod get-resource! :checksum
   [{:keys [destination checksum]}]
   (let [digest-instance (MessageDigest/getInstance (.toUpperCase checksum))]
-    (spit destination
-          (-> (.getAbsolutePath destination)
-              (string/split #"\.sha1")
-              first
-              (str ".part")
-              io/file
-              file-as-bytes
-              (calculate-checksum digest-instance)))))
+    (if-let [f (get-file-to-checksum destination checksum)]
+      (spit destination (calculate-checksum (file-as-bytes f) digest-instance))
+      (lein/warn "Could not find destination file to checksum"))))
 
 (defmethod get-resource! :pom
   [{:keys [destination manifests] :as dep}]
