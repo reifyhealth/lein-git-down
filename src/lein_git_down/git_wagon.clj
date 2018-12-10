@@ -20,7 +20,8 @@
            (org.apache.maven.wagon.repository Repository)
            (org.apache.maven.wagon.resource Resource)
            (org.eclipse.jgit.api.errors InvalidRemoteException)
-           (org.eclipse.jgit.errors NoRemoteRepositoryException)))
+           (org.eclipse.jgit.errors NoRemoteRepositoryException)
+           (org.apache.commons.codec.binary Hex)))
 
 ;;
 ;; Helpers
@@ -180,9 +181,8 @@
 
 (defn calculate-checksum
   [bytes instance]
-  (.toString
-    (BigInteger. 1 (.digest instance bytes))
-    16))
+  (String.
+    (Hex/encodeHex (.digest instance bytes))))
 
 (defmethod get-resource! :checksum
   [{:keys [destination checksum]}]
