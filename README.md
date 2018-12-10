@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[reifyhealth/lein-git-down "0.1.0"]]
+:plugins [[reifyhealth/lein-git-down "0.2.0"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -45,7 +45,7 @@ The available properties are:
 Below is an example `project.clj` that uses the plugin:
 
 ```clojure
-(defproject test-project "0.1.0"
+(defproject test-project "0.2.0"
     :description "A test project"
     ;; Include the plugin
     :plugins [[reifyhealth/lein-git-down "0.1.0"]]
@@ -86,7 +86,9 @@ As mentioned at the top of this section, when the repository has a `:protocol :s
 - https://help.github.com/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent/
 - https://help.github.com/articles/working-with-ssh-key-passphrases/
 
-Side note: by default the plugin overrides an internal implementation in tools.gitlibs to provide a fix for an error that occurs if your private key has a password. This override will be removed once the [issue](https://dev.clojure.org/jira/browse/TDEPS-49) is resolved in tools.gitlibs. However, you can opt-out of this override by specifying `:monkeypatch-tools-gitlibs false` at the top level of your `project.clj` file.
+One caveat to the above articles, the SSH library used by this plugin does not support private keys in OpenSSH format, which is now the default format used by `ssh-keygen`. You will need to generate your key pair in PEM format using the `-m PEM` flag. This plugin has been patched to skip any keys in an unsupported format instead of failing, but the key used to access the remote git repository must be in a supported format even if others in your environment are not.
+
+Side note: by default the plugin overrides an internal implementation in tools.gitlibs to provide the above fix for skipping unsupported keys and to provide a fix for an error that occurs if your private key has a password. You can opt-out of this override by specifying `:monkeypatch-tools-gitlibs false` at the top level of your `project.clj` file.
 
 ## Rationale
 
@@ -107,36 +109,13 @@ There are several other tools that are available. Below is a brief, non-exhausti
 - **tools.deps** is a fantastic addition to the Clojure tooling ecosystem and served as an inspiration behind this project. Its purpose, however, is slightly orthogonal in that it focuses on a new way of managing Clojure projects in addition to supporting the command line tools. Alternatively, this plugin allows existing Leiningen projects to continue to use the same build tooling while adding in the previously missing feature of native Git dependency resolution. Additionally, we support multiple manifest types for dependency's, not just `deps.edn` files.
 - The [**lein-tools-deps**](https://github.com/RickMoynihan/lein-tools-deps) plugin is another nice project, which allows Leiningen users to include dependencies from a `deps.edn` in their Leiningen project. It takes the approach of dropping the `:dependencies` specified in the `project.clj` and instead replacing them with those resolved by `tools.deps`. This provides a nice hybrid approach, however, it means that Leiningen built-in dependency tooling will not work as expected. It also means maintaining at least two build files: the `project.clj` and a `deps.edn`.
 - The [**lein-git-deps**](https://github.com/tobyhede/lein-git-deps) plugin has a similar purpose as this one. The primary difference is that `lein-git-deps` simply clones the remote repository locally and adds it to the class path. It does not resolve any transitive dependencies of the remote repository and also does not support native Maven dependency tooling.
-- [**lein-voom**](https://github.com/LonoCloud/lein-voom) is another interesting plugin. It too has a slightly different use case in that it supports a "SNAPSHOT" like workflow using a Git repository as a substitution for Maven maintaining mutating iterative versions. While its focus is different, it also requires the user to already have the remote repository cloned onto their local machine an to update it manually with new downstream versions. Additionally, it only supports Leiningen projects for remote dependencies.
+- [**lein-voom**](https://github.com/LonoCloud/lein-voom) is another interesting plugin. It too has a slightly different use case in that it supports a "SNAPSHOT" like workflow using a Git repository as a substitution for Maven maintaining mutating iterative versions. While its focus is different, it also requires the user to already have the remote repository cloned onto their local machine and to update it manually with new downstream versions. Additionally, it only supports Leiningen projects for remote dependencies.
 
 All of these listed are great projects and may be what solves your problem. If they are, use them! We found that we needed a slightly different approach and so created this project. We hope it is useful and furthers the larger discussion around continually improving development workflows and tools.
 
 ## Contributing
 
-Here are a few guidelines for different types of requests.
-
-### Bug Reports
-
-When filing a bug on GitHub, please include the following to help us get the problem resolved quickly:
-
-- Steps to reproduce the bug
-- An example of your `project.clj` configurations or minimally reproducible example, if possible
-- What OS you're running on and your Leiningen, Java, Clojure, and project versions
-
-### Feature Requests
-
-Add any feature requests as GitHub issues. We can't guarantee that we will implement all features, but we love getting new ideas for ways our project can solve problems!
-
-### Contributing Code
-
-*By contributing code to this project you are agreeing to release it under the MIT license*
-
-We welcome contributions from the community! When contributing:
-
-- Check out issues that are ready to be worked on and feel free to comment if you have questions.
-- For any other contributions please discuss with us as early as possible. We want your hard work to count.
-- Add unit tests where applicable.
-- When the code is ready, open a Pull Request to `develop`. All contributions require code review before being merged.
+See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ## License
 
