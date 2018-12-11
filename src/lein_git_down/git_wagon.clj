@@ -191,11 +191,10 @@
                     first
                     (string/split #"/")
                     last
-                    (str "\\.[^\\.]+$")
+                    (str "\\.(?!" checksum ")[^\\.]+$")
                     re-pattern)]
     (->> (.getParentFile destination)
          file-seq
-         (remove #(= % destination))
          (filter #(->> % .getName (re-find file-re)))
          first)))
 
