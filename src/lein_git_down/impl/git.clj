@@ -2,11 +2,13 @@
   (:refer-clojure :exclude [resolve])
   (:require [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
-            [leiningen.core.main :as lein])
+            [leiningen.core.main :as lein]
+            [clojure.java.io :as io])
   (:import (com.jcraft.jsch JSch Session UserInfo ConfigRepository ConfigRepository$Config KeyPair)
            (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
-           (org.eclipse.jgit.api TransportConfigCallback)
-           (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory OpenSshConfig)))
+           (org.eclipse.jgit.api TransportConfigCallback Git)
+           (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory OpenSshConfig)
+           (java.io File)))
 
 ;; This namespace provides patched `procure` & `resolve` functions that fix
 ;; issues in JGit's implementation of JSCH. The first is a problem that causes
@@ -77,6 +79,8 @@
                                       vs)))))))))))))))))))
 
 (defn procure
+  "Monkey patches gitlibs/procure to resolve some JSCH issues unless explicitly
+  told not to."
   [uri mvn-coords rev]
   (if *monkeypatch-tools-gitlibs*
     (with-redefs [git-impl/ssh-callback ssh-callback]
@@ -84,8 +88,32 @@
     (git/procure uri mvn-coords rev)))
 
 (defn resolve
+  "Monkey patches gitlibs/resolve to resolve some JSCH issues unless explicitly
+  told not to."
   [uri version]
   (if *monkeypatch-tools-gitlibs*
     (with-redefs [git-impl/ssh-callback ssh-callback]
       (git/resolve uri version))
     (git/resolve uri version)))
+
+(defn init
+  "Initializes a fresh git repository at `project-dir` and sets HEAD to the
+  provided rev, which allows tooling to retrieve the correct HEAD commit in
+  the gitlibs repo directory. Returns the .git directory."
+  [^File project-dir rev]
+  (let [git-dir (.. (Git/init)
+                    (setDirectory project-dir)
+                    call
+                    getRepository
+                    getDirectory)]
+    (spit (io/file git-dir "HEAD") rev)
+    git-dir))
+
+(defn rm
+  "Removes the .git directory returning a checkout back to just the checked
+  out code."
+  [^File git-dir]
+  (when (and (.exists git-dir) (= ".git" (.getName git-dir)))
+    (->> (file-seq git-dir)
+         reverse
+         (run! #(when (.exists %) (.delete %))))))
