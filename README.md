@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[reifyhealth/lein-git-down "0.2.1"]]
+:plugins [[reifyhealth/lein-git-down "0.2.2"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -45,7 +45,7 @@ The available properties are:
 Below is an example `project.clj` that uses the plugin:
 
 ```clojure
-(defproject test-project "0.2.1"
+(defproject test-project "0.2.2"
     :description "A test project"
     ;; Include the plugin
     :plugins [[reifyhealth/lein-git-down "0.1.0"]]
