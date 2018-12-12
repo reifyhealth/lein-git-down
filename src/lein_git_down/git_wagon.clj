@@ -102,12 +102,18 @@
 (defn lein-jar
   [project-file]
   (let [{:keys [root] :as project} (project/read (str project-file))]
-    (binding [leval/*dir* root]
-      (-> project
-          (#'lein/remove-alias "jar")
-          lein-jar/jar
-          (get [:extension "jar"])
-          io/file))))
+    (try
+      (binding [leval/*dir* root]
+        ;; Leiningen runs git commands to obtain information for the jar
+        (git/init (io/file root) (-> root (string/split #"/") last))
+        (-> project
+            (#'lein/remove-alias "jar")
+            lein-jar/jar
+            (get [:extension "jar"])
+            io/file))
+      (finally
+        ;; Clean-up the git meta-information to return to status quo
+        (git/rm (io/file root ".git"))))))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]
