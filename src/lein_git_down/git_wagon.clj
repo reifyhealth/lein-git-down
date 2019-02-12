@@ -12,16 +12,21 @@
             ;; can cause race conditions with the wagon threads loading jars.
             ;; To avoid this, we are requiring them here.
             [leiningen.jar :as lein-jar]
-            [leiningen.javac])
+            [leiningen.javac]
+            ;; All calls to `project/read` must be wrapped in hooke/with-scope
+            ;; to prevent the root level var changes that hooke makes from
+            ;; spreading to other builds when there are multiple git deps
+            ;; using Leiningen
+            [robert.hooke :as hooke])
   (:import (java.io File FileInputStream)
            (java.security MessageDigest)
+           (org.apache.commons.codec.binary Hex)
            (org.apache.maven.wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
            (org.apache.maven.wagon.events TransferEvent)
            (org.apache.maven.wagon.repository Repository)
            (org.apache.maven.wagon.resource Resource)
            (org.eclipse.jgit.api.errors InvalidRemoteException)
-           (org.eclipse.jgit.errors NoRemoteRepositoryException)
-           (org.apache.commons.codec.binary Hex)))
+           (org.eclipse.jgit.errors NoRemoteRepositoryException)))
 
 ;;
 ;; Helpers
@@ -53,7 +58,8 @@
 
 (defmethod resolve-pom! :leiningen
   [[_ project]]
-  (io/file (lein/apply-task "pom" (project/read (str project)) [])))
+  (hooke/with-scope
+    (io/file (lein/apply-task "pom" (project/read (str project)) []))))
 
 (defn to-dep
   [[lib {:keys [git/url sha mvn/version classifier exclusions]}]]
@@ -99,21 +105,38 @@
 ;; Resolve JAR
 ;;
 
+;; When resolving jars, Maven/Aether concurrently runs the "get" command
+;; across all the missing dependencies. This makes sense when the wagon
+;; is simply retrieving a jar file from a remote repository, but we are
+;; building the jar from the source and part of the current Leiningen
+;; build process is to use `alter-var-root` as part of the robert/hooke
+;; library to alter behavior with "hooks". We are scoping these root var
+;; changes, however the scoping is *not* thread local and so not thread-safe.
+;; This means that when we build the jar we have to synchronize the function
+;; call so that only one thread is executing it at a time. This will slow
+;; down builds linearly per the number of git repositories that need to
+;; be resolved, but the trade-off is required to ensure safely building
+;; each dependency in isolation. When hooks are removed in Leiningen 3.0
+;; we can revert the synchronization.
+(defonce jar-lock (Object.))
+
 (defn lein-jar
   [project-file]
-  (let [{:keys [root] :as project} (project/read (str project-file))]
-    (try
-      (binding [leval/*dir* root]
-        ;; Leiningen runs git commands to obtain information for the jar
-        (git/init (io/file root) (-> root (string/split #"/") last))
-        (-> project
-            (#'lein/remove-alias "jar")
-            lein-jar/jar
-            (get [:extension "jar"])
-            io/file))
-      (finally
-        ;; Clean-up the git meta-information to return to status quo
-        (git/rm (io/file root ".git"))))))
+  (locking jar-lock
+    (hooke/with-scope
+      (let [{:keys [root] :as project} (project/read (str project-file))]
+        (try
+          (binding [leval/*dir* root]
+            ;; Leiningen runs git commands to obtain information for the jar
+            (git/init (io/file root) (-> root (string/split #"/") last))
+            (-> project
+                (#'lein/remove-alias "jar")
+                lein-jar/jar
+                (get [:extension "jar"])
+                io/file))
+          (finally
+            ;; Clean-up the git meta-information to return to status quo
+            (git/rm (io/file root ".git"))))))))
 
 (defn gen-project
   [{:keys [name group version source-paths resource-paths]} ^File destination]

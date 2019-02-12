@@ -30,11 +30,14 @@
 (def clj-time-path
   "clj-time/clj-time/66ea91e68583e7ee246d375859414b9a9b7aba57")
 
+(def cljfmt-path
+  "cljfmt/cljfmt/806e43b7a7d4e22b831d796f107f135d8efc986a")
+
 (defn clean-up-artifacts!
   "Deletes all gitlibs and m2 artifacts from the local filesystem to prepare
   for testing"
   []
-  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path]
+  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path cljfmt-path]
           root [m2-root deps-root]]
     (let [dir (io/file root path)]
       (->> (file-seq dir)
