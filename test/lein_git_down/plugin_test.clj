@@ -33,11 +33,14 @@
 (def cljfmt-path
   "cljfmt/cljfmt/806e43b7a7d4e22b831d796f107f135d8efc986a")
 
+(def test-project-path
+  "test-project/target")
+
 (defn clean-up-artifacts!
   "Deletes all gitlibs and m2 artifacts from the local filesystem to prepare
   for testing"
   []
-  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path cljfmt-path]
+  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path cljfmt-path test-project-path]
           root [m2-root deps-root]]
     (let [dir (io/file root path)]
       (->> (file-seq dir)
@@ -82,6 +85,10 @@
            clj-time-path
            "clj-time-66ea91e68583e7ee246d375859414b9a9b7aba57.jar"))
 
+(defn get-test-project-jar
+  []
+  (io/file "test-project/target/test-project-0.1.0.jar"))
+
 (deftest resolve-git-deps
   (testing "Resolution of git dependencies"
 
@@ -105,6 +112,10 @@
 
       (testing "for multiple project"
         (let [^File jar (get-clj-time-jar)]
+          (is (.exists jar))))
+
+      (testing "for the test project jar"
+        (let [^File jar (get-test-project-jar)]
           (is (.exists jar)))))
 
     (testing "without cleaning"
@@ -125,4 +136,8 @@
 
       (testing "for multiple project"
         (let [^File jar (get-clj-time-jar)]
+          (is (.exists jar))))
+
+      (testing "for the test project jar"
+        (let [^File jar (get-test-project-jar)]
           (is (.exists jar)))))))
