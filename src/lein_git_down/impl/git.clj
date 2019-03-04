@@ -4,12 +4,13 @@
             [clojure.string :as string]
             [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
-            [leiningen.core.main :as lein])
+            [leiningen.core.main :as lein]
+            [robert.hooke :as hooke])
   (:import (com.jcraft.jsch JSch Session UserInfo ConfigRepository ConfigRepository$Config KeyPair)
            (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
            (org.eclipse.jgit.api TransportConfigCallback Git)
            (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory OpenSshConfig)
-           (java.io File Writer)))
+           (java.io File)))
 
 ;; This namespace provides patched `procure` & `resolve` functions that fix
 ;; issues in JGit's implementation of JSCH. The first is a problem that causes
@@ -100,20 +101,15 @@
                                         (filter (partial valid-key? jsch) vs))
                                       vs)))))))))))))))))))
 
-(def dev-null
-  "Silent Writer. Used to silence the gitlibs log lines."
-  (proxy [Writer] []
-    (close [])
-    (flush [])
-    (write
-      ([^chars _])
-      ([^chars _ ^Integer _ ^Integer _]))))
+(defn dev-null-hook
+  [_ & _])
 
 (defn procure
   "Monkey patches gitlibs/procure to resolve some JSCH issues unless explicitly
   told not to."
   [uri mvn-coords rev]
-  (binding [*err* dev-null]
+  (hooke/with-scope
+    (hooke/add-hook #'git-impl/printerrln #'dev-null-hook)
     (if *monkeypatch-tools-gitlibs*
       (with-redefs [git-impl/ssh-callback ssh-callback]
         (git/procure uri mvn-coords rev))
@@ -123,7 +119,8 @@
   "Monkey patches gitlibs/resolve to resolve some JSCH issues unless explicitly
   told not to."
   [uri version]
-  (binding [*err* dev-null]
+  (hooke/with-scope
+    (hooke/add-hook #'git-impl/printerrln #'dev-null-hook)
     (if *monkeypatch-tools-gitlibs*
       (with-redefs [git-impl/ssh-callback ssh-callback]
         (git/resolve uri version))
