@@ -41,7 +41,7 @@
   [^Session session k]
   (into #{}
         (filter #(nil? (JSch/getConfig %)))
-        (string/split (or (.getConfig session k) "") #",")))
+        (some-> (.getConfig session k) (string/split #","))))
 
 (defn check-algorithms
   "Jsch fails with an NPE when an unsupported algorithm is configured in the
