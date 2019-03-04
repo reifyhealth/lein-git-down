@@ -1,5 +1,6 @@
 (ns lein-git-down.plugin-test
   (:require [clojure.java.io :as io]
+            [clojure.string :as string]
             [clojure.test :refer [deftest testing is]]
             [clojure.tools.gitlibs :as git]
             [leiningen.core.main :as lein])
@@ -8,9 +9,8 @@
            (java.io File)))
 
 (def m2-root
-  (->> (ClassLoader/getSystemClassLoader)
-       (.getURLs)
-       (map str)
+  (->> (string/split (System/getProperty "java.class.path")
+                     (re-pattern File/pathSeparator))
        (some #(when (.contains % ".m2") %))
        (re-find #"/.*/\.m2/repository")
        io/file))
