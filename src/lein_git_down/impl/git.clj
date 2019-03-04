@@ -1,9 +1,11 @@
 (ns lein-git-down.impl.git
   (:refer-clojure :exclude [resolve])
-  (:require [clojure.tools.gitlibs :as git]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as string]
+            [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
             [leiningen.core.main :as lein]
-            [clojure.java.io :as io])
+            [robert.hooke :as hooke])
   (:import (com.jcraft.jsch JSch Session UserInfo ConfigRepository ConfigRepository$Config KeyPair)
            (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
            (org.eclipse.jgit.api TransportConfigCallback Git)
@@ -35,6 +37,26 @@
                    m "Skipping..."))
       false)))
 
+(defn get-unsupported-algorithms
+  [^Session session k]
+  (into #{}
+        (filter #(nil? (JSch/getConfig %)))
+        (some-> (.getConfig session k) (string/split #","))))
+
+(defn check-algorithms
+  "Jsch fails with an NPE when an unsupported algorithm is configured in the
+  ssh config file. This provides the user with more helpful information as to
+  the cause of the error."
+  [^Session session]
+  (let [kex (get-unsupported-algorithms session "kex")
+        cph (get-unsupported-algorithms session "cipher.c2s")
+        mac (get-unsupported-algorithms session "mac.c2s")
+        msg (str "Detected unsupported algorithm(s) configured for the '%s' "
+                 "property in ssh config: %s")]
+    (when (not-empty kex) (lein/warn (format msg "KexAlgorithms" kex)))
+    (when (not-empty cph) (lein/warn (format msg "Ciphers" cph)))
+    (when (not-empty mac) (lein/warn (format msg "MACs" mac)))))
+
 (def ssh-callback
   (delay
     (let [factory (doto (ConnectorFactory/getDefault)
@@ -47,6 +69,7 @@
             ^SshTransport transport
             (proxy [JschConfigSessionFactory] []
               (configure [_host session]
+                (check-algorithms session)
                 (.setUserInfo
                   ^Session session
                   (proxy [UserInfo] []
@@ -78,23 +101,30 @@
                                         (filter (partial valid-key? jsch) vs))
                                       vs)))))))))))))))))))
 
+(defn dev-null-hook
+  [_ & _])
+
 (defn procure
   "Monkey patches gitlibs/procure to resolve some JSCH issues unless explicitly
   told not to."
   [uri mvn-coords rev]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/procure uri mvn-coords rev))
-    (git/procure uri mvn-coords rev)))
+  (hooke/with-scope
+    (hooke/add-hook #'git-impl/printerrln #'dev-null-hook)
+    (if *monkeypatch-tools-gitlibs*
+      (with-redefs [git-impl/ssh-callback ssh-callback]
+        (git/procure uri mvn-coords rev))
+      (git/procure uri mvn-coords rev))))
 
 (defn resolve
   "Monkey patches gitlibs/resolve to resolve some JSCH issues unless explicitly
   told not to."
   [uri version]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/resolve uri version))
-    (git/resolve uri version)))
+  (hooke/with-scope
+    (hooke/add-hook #'git-impl/printerrln #'dev-null-hook)
+    (if *monkeypatch-tools-gitlibs*
+      (with-redefs [git-impl/ssh-callback ssh-callback]
+        (git/resolve uri version))
+      (git/resolve uri version))))
 
 (defn init
   "Initializes a fresh git repository at `project-dir` and sets HEAD to the
