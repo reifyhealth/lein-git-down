@@ -1,14 +1,15 @@
 (ns lein-git-down.impl.git
   (:refer-clojure :exclude [resolve])
-  (:require [clojure.tools.gitlibs :as git]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as string]
+            [clojure.tools.gitlibs :as git]
             [clojure.tools.gitlibs.impl :as git-impl]
-            [leiningen.core.main :as lein]
-            [clojure.java.io :as io])
+            [leiningen.core.main :as lein])
   (:import (com.jcraft.jsch JSch Session UserInfo ConfigRepository ConfigRepository$Config KeyPair)
            (com.jcraft.jsch.agentproxy ConnectorFactory RemoteIdentityRepository)
            (org.eclipse.jgit.api TransportConfigCallback Git)
            (org.eclipse.jgit.transport SshTransport JschConfigSessionFactory OpenSshConfig)
-           (java.io File)))
+           (java.io File Writer)))
 
 ;; This namespace provides patched `procure` & `resolve` functions that fix
 ;; issues in JGit's implementation of JSCH. The first is a problem that causes
@@ -35,6 +36,26 @@
                    m "Skipping..."))
       false)))
 
+(defn get-unsupported-algorithms
+  [^Session session k]
+  (into #{}
+        (filter #(nil? (JSch/getConfig %)))
+        (string/split (or (.getConfig session k) "") #",")))
+
+(defn check-algorithms
+  "Jsch fails with an NPE when an unsupported algorithm is configured in the
+  ssh config file. This provides the user with more helpful information as to
+  the cause of the error."
+  [^Session session]
+  (let [kex (get-unsupported-algorithms session "kex")
+        cph (get-unsupported-algorithms session "cipher.c2s")
+        mac (get-unsupported-algorithms session "mac.c2s")
+        msg (str "Detected unsupported algorithm(s) configured for the '%s' "
+                 "property in ssh config: %s")]
+    (when (not-empty kex) (lein/warn (format msg "KexAlgorithms" kex)))
+    (when (not-empty cph) (lein/warn (format msg "Ciphers" cph)))
+    (when (not-empty mac) (lein/warn (format msg "MACs" mac)))))
+
 (def ssh-callback
   (delay
     (let [factory (doto (ConnectorFactory/getDefault)
@@ -47,6 +68,7 @@
             ^SshTransport transport
             (proxy [JschConfigSessionFactory] []
               (configure [_host session]
+                (check-algorithms session)
                 (.setUserInfo
                   ^Session session
                   (proxy [UserInfo] []
@@ -78,23 +100,34 @@
                                         (filter (partial valid-key? jsch) vs))
                                       vs)))))))))))))))))))
 
+(def dev-null
+  "Silent Writer. Used to silence the gitlibs log lines."
+  (proxy [Writer] []
+    (close [])
+    (flush [])
+    (write
+      ([^chars _])
+      ([^chars _ ^Integer _ ^Integer _]))))
+
 (defn procure
   "Monkey patches gitlibs/procure to resolve some JSCH issues unless explicitly
   told not to."
   [uri mvn-coords rev]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/procure uri mvn-coords rev))
-    (git/procure uri mvn-coords rev)))
+  (binding [*err* dev-null]
+    (if *monkeypatch-tools-gitlibs*
+      (with-redefs [git-impl/ssh-callback ssh-callback]
+        (git/procure uri mvn-coords rev))
+      (git/procure uri mvn-coords rev))))
 
 (defn resolve
   "Monkey patches gitlibs/resolve to resolve some JSCH issues unless explicitly
   told not to."
   [uri version]
-  (if *monkeypatch-tools-gitlibs*
-    (with-redefs [git-impl/ssh-callback ssh-callback]
-      (git/resolve uri version))
-    (git/resolve uri version)))
+  (binding [*err* dev-null]
+    (if *monkeypatch-tools-gitlibs*
+      (with-redefs [git-impl/ssh-callback ssh-callback]
+        (git/resolve uri version))
+      (git/resolve uri version))))
 
 (defn init
   "Initializes a fresh git repository at `project-dir` and sets HEAD to the
