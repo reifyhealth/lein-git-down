@@ -7,7 +7,7 @@ A [Leiningen](https://leiningen.org/) plugin for resolving Clojure(Script) depen
 Add the plugin to the `:plugins` vector of your `project.clj`:
 
 ```clojure
-:plugins [[reifyhealth/lein-git-down "0.3.2"]]
+:plugins [[reifyhealth/lein-git-down "0.3.3"]]
 ```
 
 If you have dependency specific configurations (see below), add the plugin's `inject-properties` function to your `:middleware` vector:
@@ -48,7 +48,7 @@ Below is an example `project.clj` that uses the plugin:
 (defproject test-project "0.1.0"
     :description "A test project"
     ;; Include the plugin
-    :plugins [[reifyhealth/lein-git-down "0.3.2"]]
+    :plugins [[reifyhealth/lein-git-down "0.3.3"]]
     ;; Add the middleware to parse the custom configurations
     :middleware [lein-git-down.plugin/inject-properties]
     ;; Specify your dependencies. This is the same as any other project.clj and
@@ -89,6 +89,18 @@ As mentioned at the top of this section, when the repository has a `:protocol :s
 One caveat to the above articles, the SSH library used by this plugin does not support private keys in OpenSSH format, which is now the default format used by `ssh-keygen`. You will need to generate your key pair in PEM format using the `-m PEM` flag. This plugin has been patched to skip any keys in an unsupported format instead of failing, but the key used to access the remote git repository must be in a supported format even if others in your environment are not.
 
 Side note: by default the plugin overrides an internal implementation in tools.gitlibs to provide the above fix for skipping unsupported keys and to provide a fix for an error that occurs if your private key has a password. You can opt-out of this override by specifying `:monkeypatch-tools-gitlibs false` at the top level of your `project.clj` file.
+
+#### SSH Config
+
+The jsch library does not support all HostKeyAlgorithms, Ciphers, MACs, and KexAlgorithms and will warn you about unsupported configurations in your `~/.ssh/config` file. If you do want to configure these and not rely on the defaults, then the below is an example snippet that is fully supported:
+
+```
+Host github.com
+  HostKeyAlgorithms ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp384-cert-v01@openssh.com,ecdsa-sha2-nistp521-cert-v01@openssh.com,ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,ssh-ed25519,rsa-sha2-512,rsa-sha2-256,ssh-rsa
+  Ciphers aes128-ctr,aes192-ctr,aes256-ctr
+  MACs hmac-sha2-256,hmac-sha1
+  KexAlgorithms ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group14-sha1
+```
 
 ## Rationale
 
