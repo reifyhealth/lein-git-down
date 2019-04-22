@@ -349,13 +349,14 @@
       (catch InvalidRemoteException e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
         (if (instance? NoRemoteRepositoryException (.getCause e))
-          (do (lein/warn (str "Could not find remote git repository at "
-                              git-uri ". Did you add the git coordinates "
-                              "to the `:git-down` key in project.clj? If "
-                              "so, you may not have permissions to read "
-                              "the repository if it is private."))
-              (throw (ResourceDoesNotExistException.
-                       (.getMessage (.getCause e)) e)))
+          (let [uri (git-uri @properties (:mvn-coords (parse-resource resource-name)))]
+            (lein/warn (str "Could not find remote git repository at "
+                            uri ". Did you add the git coordinates "
+                            "to the `:git-down` key in project.clj? If "
+                            "so, you may not have permissions to read "
+                            "the repository if it is private."))
+            (throw (ResourceDoesNotExistException.
+                    (.getMessage (.getCause e)) e)))
           (throw (ResourceDoesNotExistException. (.getMessage e) e))))
       (catch Throwable e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
