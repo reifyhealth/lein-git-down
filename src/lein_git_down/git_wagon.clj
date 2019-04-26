@@ -46,6 +46,13 @@
   [coll]
   (nth-last 1 coll))
 
+(defn vectorize
+  [x]
+  (cond
+    (vector? x)     x
+    (sequential? x) (into [] x)
+    :else           [x]))
+
 ;;
 ;; Resolve POM
 ;;
@@ -147,15 +154,26 @@
             true (conj version (symbol group name) 'defproject)))
   destination)
 
+(defn get-pom-source-dirs
+  [build]
+  (vectorize
+    (or (:sourceDirectory build)
+        (some-> (filter #(= (:artifactId %) "clojure-maven-plugin")
+                        (get-in build [:plugins :plugin]))
+                first
+                (get-in [:configuration :sourceDirectories :sourceDirectory])
+                not-empty)
+        "src")))
+
 (defn parse-pom
   [^File pom-file]
   (let [{:keys [artifactId groupId version build]} (pom/parse-pom pom-file)
-        source-directory (or (:sourceDirectory build) "src")
-        resource-paths   (get-in build [:resources :resource])]
+        source-directories (get-pom-source-dirs build)
+        resource-paths (get-in build [:resources :resource])]
     (cond-> {:name artifactId
              :group groupId
              :version version
-             :source-paths [source-directory]}
+             :source-paths source-directories}
             (vector? resource-paths) (assoc :resource-paths (mapv :directory resource-paths))
             (map? resource-paths)    (assoc :resource-paths [(:directory resource-paths)]))))
 
