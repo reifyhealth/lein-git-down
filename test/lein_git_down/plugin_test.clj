@@ -27,6 +27,9 @@
 (def demo-deps-path
   "demo-deps/demo-deps/19d387dc11d804ab955207a263dfba5dbd15bf2c")
 
+(def fc4-framework-path
+  "FundingCircle/fc4-framework/c0a9777d3bb908651a0fd4f3dd151277fa10ff93")
+
 (def clj-time-path
   "clj-time/clj-time/66ea91e68583e7ee246d375859414b9a9b7aba57")
 
@@ -40,7 +43,13 @@
   "Deletes all gitlibs and m2 artifacts from the local filesystem to prepare
   for testing"
   []
-  (doseq [path [pomegranate-path cheshire-path demo-deps-path clj-time-path cljfmt-path test-project-path]
+  (doseq [path [pomegranate-path
+                cheshire-path
+                demo-deps-path
+                fc4-framework-path
+                clj-time-path
+                cljfmt-path
+                test-project-path]
           root [m2-root deps-root]]
     (let [dir (io/file root path)]
       (->> (file-seq dir)
@@ -79,6 +88,12 @@
            demo-deps-path
            "demo-deps-19d387dc11d804ab955207a263dfba5dbd15bf2c.jar"))
 
+(defn get-fc4-framework-jar
+  []
+  (io/file m2-root
+           fc4-framework-path
+           "fc4-framework-c0a9777d3bb908651a0fd4f3dd151277fa10ff93.jar"))
+
 (defn get-clj-time-jar
   []
   (io/file m2-root
@@ -110,6 +125,10 @@
         (let [^File jar (get-demo-deps-jar)]
           (is (.exists jar))))
 
+      (testing "for deps projects with transitive git deps"
+        (let [^File jar (get-fc4-framework-jar)]
+          (is (.exists jar))))
+
       (testing "for multiple project"
         (let [^File jar (get-clj-time-jar)]
           (is (.exists jar))))
@@ -132,6 +151,10 @@
 
       (testing "for deps based project"
         (let [^File jar (get-demo-deps-jar)]
+          (is (.exists jar))))
+
+      (testing "for deps projects with transitive git deps"
+        (let [^File jar (get-fc4-framework-jar)]
           (is (.exists jar))))
 
       (testing "for multiple project"
