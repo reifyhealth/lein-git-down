@@ -71,7 +71,7 @@
 (defn to-dep
   [[lib {:keys [git/url sha mvn/version classifier exclusions]}]]
   (if url
-    (let [parts (string/split url #"/")]
+    (let [parts (-> url (string/split #":") last (string/split #"/"))]
       {:group    (penultimate parts)
        :artifact (-> parts last (string/split #"\.") first)
        :version  sha})
