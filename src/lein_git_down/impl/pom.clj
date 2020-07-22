@@ -180,9 +180,13 @@
         x))
     pom))
 
+(def ^:private +load-external-dtd-feature+
+  "http://apache.org/xml/features/nonvalidating/load-external-dtd")
+
 (defn parse-pom
   [^File pom-file]
-  (let [traversal (-> (DocumentBuilderFactory/newInstance)
+  (let [traversal (-> (doto (DocumentBuilderFactory/newInstance)
+                        (.setFeature +load-external-dtd-feature+ false))
                       .newDocumentBuilder
                       (.parse pom-file))]
     (-> (reduce
