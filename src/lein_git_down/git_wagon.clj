@@ -82,10 +82,19 @@
      :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
                       exclusions)}))
 
+(defn deps-project-name
+  [^File f]
+  (loop [^File d (.getParentFile f)
+         path    (list f)]
+    (cond
+      (nil? d) (throw (Exception. "Could not find .gitlibs directory!"))
+      (= (.getName d) ".gitlibs") (.getName ^File (nth path 2))
+      :else (recur (.getParentFile d) (conj path d)))))
+
 (defmethod resolve-pom! :tools-deps
   [[_ ^File deps-edn]]
   (let [{:keys [paths deps]} (edn/read-string (slurp deps-edn))
-        proj-name (.. deps-edn getParentFile getParentFile getName)]
+        proj-name (deps-project-name deps-edn)]
     (pom/gen-pom
       {:group        proj-name
        :artifact     proj-name
