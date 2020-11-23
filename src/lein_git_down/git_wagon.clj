@@ -19,6 +19,7 @@
             ;; using Leiningen
             [robert.hooke :as hooke])
   (:import (java.io File FileInputStream)
+           (java.nio.file Paths)
            (java.security MessageDigest)
            (org.apache.commons.codec.binary Hex)
            (org.apache.maven.wagon AbstractWagon TransferFailedException ResourceDoesNotExistException)
@@ -53,6 +54,12 @@
     (sequential? x) (into [] x)
     :else           [x]))
 
+(defn git-url->coords
+  [url]
+  (let [parts (-> url (string/split #":") last (string/split #"/"))]
+    (symbol (penultimate parts)
+            (-> parts last (string/split #"\.") first))))
+
 ;;
 ;; Resolve POM
 ;;
@@ -68,39 +75,75 @@
   (hooke/with-scope
     (io/file (lein/apply-task "pom" (project/read (str project)) []))))
 
-(defn to-dep
-  [[lib {:keys [git/url sha mvn/version classifier exclusions]}]]
-  (if url
-    (let [parts (-> url (string/split #":") last (string/split #"/"))]
-      {:group    (penultimate parts)
-       :artifact (-> parts last (string/split #"\.") first)
-       :version  sha})
-    {:group      (or (namespace lib) (name lib))
-     :artifact   (name lib)
-     :version    version
-     :classifier classifier
-     :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
-                      exclusions)}))
-
-(defn deps-project-name
-  [^File f]
-  (loop [^File d (.getParentFile f)
-         path    (list f)]
+(defn ^File deps-repo-root
+  [^File deps-edn]
+  (loop [^File d (.getParentFile deps-edn)
+         path    (list deps-edn)]
     (cond
       (nil? d) (throw (Exception. "Could not find .gitlibs directory!"))
-      (= (.getName d) ".gitlibs") (.getName ^File (nth path 2))
+      (= (.getName d) ".gitlibs") (.getCanonicalFile ^File (nth path 3))
       :else (recur (.getParentFile d) (conj path d)))))
 
+(defn dep-in-repo?
+  [^File repo-root ^File deps-edn ^String local-root-path]
+  (let [local-file (-> (io/file (.getParentFile deps-edn) local-root-path)
+                       .getCanonicalFile)]
+    (and (.exists (io/file local-file "deps.edn"))
+         (.startsWith (Paths/get (.toURI local-file))
+                      (Paths/get (.toURI repo-root))))))
+
+(defn to-dep
+  [^File repo-root
+   ^File deps-edn
+   properties
+   [lib {:keys [git/url sha local/root mvn/version classifier exclusions]}]]
+  (let [dep {:group    (or (namespace lib) (name lib))
+             :artifact (name lib)}]
+    (cond
+      url
+      (let [git-coords (git-url->coords url)]
+        (swap! properties assoc-in [:debs lib] {:coordinates git-coords})
+        (assoc dep :version sha))
+
+      ;; If the dependency has a local/root specification then we check
+      ;; to see if it can be resolved relative to the repository root.
+      ;; If not, there is nothing we can do and so we return the default
+      ;; dependency map.
+      (and root (dep-in-repo? repo-root deps-edn root))
+      (let [{:keys [uri rev]} (-> (io/file repo-root ".lein-git-down")
+                                  slurp
+                                  edn/read-string)
+            git-coords (git-url->coords uri)
+            manifest-root (.toString
+                            (.relativize (Paths/get (.toURI repo-root))
+                                         (-> (io/file (.getParentFile deps-edn)
+                                                      root)
+                                             .getCanonicalFile
+                                             .toURI
+                                             Paths/get)))]
+        (swap! properties assoc-in [:deps lib] {:coordinates git-coords
+                                                :manifest-root manifest-root})
+        (assoc dep :version rev))
+
+      :else
+      (assoc dep
+        :version    version
+        :classifier classifier
+        :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
+                         exclusions)))))
+
 (defmethod resolve-pom! :tools-deps
-  [[_ ^File deps-edn]]
+  [[_ ^File deps-edn properties]]
   (let [{:keys [paths deps]} (edn/read-string (slurp deps-edn))
-        proj-name (deps-project-name deps-edn)]
+        repo-root (deps-repo-root deps-edn)
+        proj-name (.. repo-root getParentFile getName)
+        dependencies (map (partial to-dep repo-root deps-edn properties) deps)]
     (pom/gen-pom
       {:group        proj-name
        :artifact     proj-name
        :version      "0.1.0"
        :source-path  (or (first paths) "src")
-       :dependencies (map to-dep deps)}
+       :dependencies dependencies}
       (io/file (.getParentFile deps-edn) "pom.xml"))))
 
 (defn resolve-default-pom!
@@ -262,8 +305,8 @@
       (lein/warn "Could not find destination file to checksum"))))
 
 (defmethod get-resource! :pom
-  [{:keys [destination manifests] :as dep}]
-  (let [pom (condp #(find %2 %1) manifests
+  [{:keys [destination manifests properties] :as dep}]
+  (let [pom (condp #(some-> (find %2 %1) (conj properties)) manifests
               :maven      :>> resolve-pom!
               :leiningen  :>> resolve-pom!
               :tools-deps :>> resolve-pom!
@@ -371,7 +414,8 @@
                    :default-resource-root resource-root
                    :manifests             manifests
                    :destination           destination
-                   :version               version)
+                   :version               version
+                   :properties            properties)
             get-resource!))
       (catch InvalidRemoteException e
         (.fireTransferError this resource e TransferEvent/REQUEST_GET)
