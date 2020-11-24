@@ -101,8 +101,9 @@
              :artifact (name lib)}]
     (cond
       url
-      (let [git-coords (git-url->coords url)]
-        (swap! properties assoc-in [:debs lib] {:coordinates git-coords})
+      (let [mvn-coords (->> dep ((juxt :group :artifact)) (apply symbol))
+            git-coords (git-url->coords url)]
+        (swap! properties assoc-in [:deps mvn-coords] {:coordinates git-coords})
         (assoc dep :version sha))
 
       ;; If the dependency has a local/root specification then we check
@@ -113,6 +114,7 @@
       (let [{:keys [uri rev]} (-> (io/file repo-root ".lein-git-down")
                                   slurp
                                   edn/read-string)
+            mvn-coords (->> dep ((juxt :group :artifact)) (apply symbol))
             git-coords (git-url->coords uri)
             manifest-root (.toString
                             (.relativize (Paths/get (.toURI repo-root))
@@ -120,9 +122,9 @@
                                                       root)
                                              .getCanonicalFile
                                              .toURI
-                                             Paths/get)))]
-        (swap! properties assoc-in [:deps lib] {:coordinates git-coords
-                                                :manifest-root manifest-root})
+                                             Paths/get)))
+            settings {:coordinates git-coords :manifest-root manifest-root}]
+        (swap! properties assoc-in [:deps mvn-coords] settings)
         (assoc dep :version rev))
 
       :else
