@@ -101,7 +101,7 @@
              :artifact (name lib)}]
     (cond
       url
-      (let [mvn-coords (->> dep ((juxt :group :artifact)) (apply symbol))
+      (let [mvn-coords (symbol (:group dep) (:artifact dep))
             git-coords (git-url->coords url)]
         (swap! properties assoc-in [:deps mvn-coords] {:coordinates git-coords})
         (assoc dep :version sha))
@@ -114,7 +114,7 @@
       (let [{:keys [uri rev]} (-> (io/file repo-root ".lein-git-down")
                                   slurp
                                   edn/read-string)
-            mvn-coords (->> dep ((juxt :group :artifact)) (apply symbol))
+            mvn-coords (symbol (:group dep) (:artifact dep))
             git-coords (git-url->coords uri)
             manifest-root (.toString
                             (.relativize (Paths/get (.toURI repo-root))
@@ -131,7 +131,7 @@
       (assoc dep
         :version    version
         :classifier classifier
-        :exclusions (map (fn [x] {:group (namespace x) :aritfact (name x)})
+        :exclusions (map (fn [x] {:group (namespace x) :artifact (name x)})
                          exclusions)))))
 
 (defmethod resolve-pom! :tools-deps
