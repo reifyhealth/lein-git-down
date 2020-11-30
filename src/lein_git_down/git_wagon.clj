@@ -81,6 +81,10 @@
          path    (list deps-edn)]
     (cond
       (nil? d) (throw (Exception. "Could not find .gitlibs directory!"))
+      ;; once we hit the `.gitlibs` directory, we know that the 4th item
+      ;; in our path will be the repository root directory (named for the
+      ;; version), since the file structure is always static under .gitlibs:
+      ;; `libs/{group}/{artifact}/{version}`
       (= (.getName d) ".gitlibs") (.getCanonicalFile ^File (nth path 3))
       :else (recur (.getParentFile d) (conj path d)))))
 
