@@ -16,7 +16,7 @@
        io/file))
 
 (def deps-root
-  (io/file (git/cache-dir)))
+  (io/file (git/cache-dir) "libs"))
 
 (def pomegranate-path
   "com/cemerick/pomegranate/a8d0ef79d6cbbd9392dbe7f824e32dc60d46e0c0")
@@ -29,6 +29,9 @@
 
 (def fc4-framework-path
   "FundingCircle/fc4-framework/c0a9777d3bb908651a0fd4f3dd151277fa10ff93")
+
+(def expound-path
+  "expound/expound/9b5778a1a4ed91e2090308a6648ee9072076925a")
 
 (def clj-time-path
   "clj-time/clj-time/66ea91e68583e7ee246d375859414b9a9b7aba57")
@@ -47,6 +50,7 @@
                 cheshire-path
                 demo-deps-path
                 fc4-framework-path
+                expound-path ;; to confirm transitive deps.edn
                 clj-time-path
                 cljfmt-path
                 test-project-path]

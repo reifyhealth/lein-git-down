@@ -106,14 +106,18 @@
 
 (defn procure
   "Monkey patches gitlibs/procure to resolve some JSCH issues unless explicitly
-  told not to."
+  told not to. Writes a meta-data file with information about the source."
   [uri mvn-coords rev]
   (hooke/with-scope
     (hooke/add-hook #'git-impl/printerrln #'dev-null-hook)
-    (if *monkeypatch-tools-gitlibs*
-      (with-redefs [git-impl/ssh-callback ssh-callback]
-        (git/procure uri mvn-coords rev))
-      (git/procure uri mvn-coords rev))))
+    (let [path (if *monkeypatch-tools-gitlibs*
+                 (with-redefs [git-impl/ssh-callback ssh-callback]
+                   (git/procure uri mvn-coords rev))
+                 (git/procure uri mvn-coords rev))
+          meta (io/file path ".lein-git-down")]
+      (when-not (.exists meta)
+        (spit meta {:uri uri :mvn-coords mvn-coords :rev rev}))
+      path)))
 
 (defn resolve
   "Monkey patches gitlibs/resolve to resolve some JSCH issues unless explicitly
