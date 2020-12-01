@@ -14,7 +14,7 @@
                  [FundingCircle/fc4-framework "c0a9777d3bb908651a0fd4f3dd151277fa10ff93" ;; deps w/ transitive git deps
                   ;; excluding since the build requires `clojure` executable
                   ;; which is not on our CI container
-                  :exclusions [tatut/clj-chrome-devtools]]
+                  :exclusions [clj-chrome-devtools]]
                  [clj-time "66ea91e68583e7ee246d375859414b9a9b7aba57"]                   ;; multiple
                  [cljfmt "806e43b7a7d4e22b831d796f107f135d8efc986a"]                     ;; contains hooks
                  [org.clojure/clojure "1.9.0"]]
